@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../local/local_api.dart';
 
@@ -28,6 +29,36 @@ class _MainScreenState extends State<MainScreen> {
     _debounce?.cancel();
     qC.dispose();
     super.dispose();
+  }
+
+  bool _hasValidImage(String? path) {
+    if (path == null) return false;
+    final t = path.trim();
+    if (t.isEmpty) return false;
+    return File(t).existsSync();
+  }
+
+  Widget _photoBox(Product p) {
+    final path = p.imagePath?.trim();
+    final ok = _hasValidImage(path);
+
+    if (ok) {
+      return Image.file(
+        File(path!),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Center(
+          child: Icon(Icons.broken_image, size: 58, color: Colors.black.withOpacity(0.35)),
+        ),
+      );
+    }
+
+    return Center(
+      child: Icon(
+        Icons.shopping_bag_outlined,
+        size: 58,
+        color: Colors.black.withOpacity(0.35),
+      ),
+    );
   }
 
   Future<void> _loadRecent() async {
@@ -86,7 +117,6 @@ class _MainScreenState extends State<MainScreen> {
       builder: (_) => _ProductDialog(
         product: p,
         onSold: () async {
-          // refresh search results after selling
           await _search(qC.text);
         },
       ),
@@ -118,9 +148,15 @@ class _MainScreenState extends State<MainScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : results.isEmpty
                   ? const Center(child: Text('S’ka rezultate.'))
-                  : ListView.separated(
+                  : GridView.builder(
+                padding: const EdgeInsets.only(bottom: 12),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.0,
+                ),
                 itemCount: results.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (_, i) => _productCard(results[i]),
               ),
             ),
@@ -143,7 +179,7 @@ class _MainScreenState extends State<MainScreen> {
                 controller: qC,
                 onChanged: (v) {
                   _onQueryChanged(v);
-                  setState(() {}); // refresh clear icon
+                  setState(() {});
                 },
                 decoration: const InputDecoration(
                   hintText: 'Kërko me serial / SKU / emër...',
@@ -175,73 +211,128 @@ class _MainScreenState extends State<MainScreen> {
     final activeColor = p.active ? Colors.green : Colors.grey;
 
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       onTap: () => _openProductDialog(p),
       child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.black12,
-                ),
-                alignment: Alignment.center,
-                child: const Icon(Icons.shopping_bag_outlined),
+        elevation: 1.2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ===== PHOTO (big) =====
+            Container(
+              height: 170,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.06),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(p.name, style: const TextStyle(fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 4),
-                    Text(
-                      p.serialNumber ?? p.sku ?? '—',
-                      style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        _pill('Stok: ${p.stockQty}', stockColor),
-                        _pill(p.active ? 'Active' : 'OFF', activeColor),
-                        if (hasDisc) _pill('-${p.discountPercent.toStringAsFixed(0)}%', Colors.orange),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              child: Stack(
                 children: [
+                  Positioned.fill(child: _photoBox(p)), // ✅ REAL PHOTO
+
                   if (hasDisc)
-                    Text(
-                      '€${p.price.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        decoration: TextDecoration.lineThrough,
-                        fontWeight: FontWeight.w800,
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.90),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '-${p.discountPercent.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
-                  Text(
-                    '€${fp.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                ],
+              ),
+            ),
+
+            // ===== ATTRIBUTES (below) =====
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              p.serialNumber ?? p.sku ?? '—',
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          if (hasDisc)
+                            Text(
+                              '€${p.price.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                decoration: TextDecoration.lineThrough,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          Text(
+                            '€${fp.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+
+                  const SizedBox(height: 10),
+
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _pill('Stok: ${p.stockQty}', stockColor),
+                      _pill(p.active ? 'Active' : 'OFF', activeColor),
+                      if (hasDisc) _pill('-${p.discountPercent.toStringAsFixed(0)}%', Colors.orange),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
                   Text(
                     'Kliko për detaje',
-                    style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w700, fontSize: 12),
-                  )
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
-              )
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -325,7 +416,6 @@ class _ProductDialogState extends State<_ProductDialog> {
                 const Divider(height: 1),
                 const SizedBox(height: 12),
 
-                // Price block (rich)
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -444,7 +534,6 @@ class _ProductDialogState extends State<_ProductDialog> {
     try {
       final res = await LocalApi.I.sellOne(productId: widget.product.id);
 
-      // refresh list on parent
       await widget.onSold();
 
       if (!mounted) return;
@@ -454,7 +543,6 @@ class _ProductDialogState extends State<_ProductDialog> {
         soldTotal = res.total;
       });
 
-      // auto-close after 1s (optional)
       await Future.delayed(const Duration(milliseconds: 900));
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -484,15 +572,10 @@ class _ProductDialogState extends State<_ProductDialog> {
         const Text('U shit me sukses ✅', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
         const SizedBox(height: 10),
         if (soldInvoice != null)
-          Text(
-            'Invoice: $soldInvoice',
-            style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w800),
-          ),
+          Text('Invoice: $soldInvoice', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w800)),
         if (soldTotal != null)
-          Text(
-            'Total: €${soldTotal!.toStringAsFixed(2)}',
-            style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w800),
-          ),
+          Text('Total: €${soldTotal!.toStringAsFixed(2)}',
+              style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w800)),
         const SizedBox(height: 14),
         const Text('Duke u mbyllur...', style: TextStyle(fontWeight: FontWeight.w800)),
         const SizedBox(height: 6),

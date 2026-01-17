@@ -1,5 +1,26 @@
+// admin_screen.dart
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:file_selector/file_selector.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
 import '../local/local_api.dart';
+
+/// ✅ Kjo file e ka:
+/// - Expenses + Invest dialogs (si i ke)
+/// - Statistika Sot/Muaj/Total (si i ke)
+/// - ✅ Print: Dita / Muaji / Viti / Total
+/// - ✅ Ruaj si PDF (Save As)
+///
+/// ⚠️ Shënim:
+/// - “VITI” kërkon query vjetor nga DB/API. Këtu është gati UI + PDF,
+///   por vlerat vjetore janë placeholder derisa ta shtojmë te LocalApi.
+
+String monthKey(DateTime d) =>
+    '${d.year}-${(d.month).toString().padLeft(2, '0')}';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -7,6 +28,8 @@ class AdminScreen extends StatefulWidget {
   @override
   State<AdminScreen> createState() => _AdminScreenState();
 }
+
+enum _ReportScope { day, month, year, total }
 
 class _AdminScreenState extends State<AdminScreen> {
   bool loading = true;
@@ -59,6 +82,44 @@ class _AdminScreenState extends State<AdminScreen> {
     return '${pad2(d.day)}.${pad2(d.month)}.${d.year}';
   }
 
+  int _selectedYear() {
+    final parts = selectedMonth.split('-');
+    return int.tryParse(parts.first) ?? DateTime.now().year;
+  }
+
+  String _scopeTitle(_ReportScope s) {
+    switch (s) {
+      case _ReportScope.day:
+        return 'Raport Ditor';
+      case _ReportScope.month:
+        return 'Raport Mujor';
+      case _ReportScope.year:
+        return 'Raport Vjetor';
+      case _ReportScope.total:
+        return 'Raport Total';
+    }
+  }
+
+  String _pdfFileName(_ReportScope scope) {
+    final now = DateTime.now();
+    String pad2(int n) => n.toString().padLeft(2, '0');
+
+    final day = '${now.year}-${pad2(now.month)}-${pad2(now.day)}';
+    final mk = selectedMonth; // "YYYY-MM"
+    final y = _selectedYear();
+
+    switch (scope) {
+      case _ReportScope.day:
+        return 'raport-ditor-$day.pdf';
+      case _ReportScope.month:
+        return 'raport-mujor-$mk.pdf';
+      case _ReportScope.year:
+        return 'raport-vjetor-$y.pdf';
+      case _ReportScope.total:
+        return 'raport-total-$day.pdf';
+    }
+  }
+
   // ✅ simple “success animation” (check icon pop)
   Future<void> _showSuccessDialog(String msg) async {
     if (!mounted) return;
@@ -84,7 +145,6 @@ class _AdminScreenState extends State<AdminScreen> {
       },
     );
 
-    // auto close after a moment
     await Future.delayed(const Duration(milliseconds: 900));
     if (mounted && Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
@@ -123,7 +183,8 @@ class _AdminScreenState extends State<AdminScreen> {
     final mk = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Zgjedh muajin', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text('Zgjedh muajin',
+            style: TextStyle(fontWeight: FontWeight.w900)),
         content: SizedBox(
           width: 420,
           child: ListView(
@@ -131,15 +192,19 @@ class _AdminScreenState extends State<AdminScreen> {
             children: [
               for (final m in monthOptions)
                 ListTile(
-                  title: Text(_formatMonthLabel(m), style: const TextStyle(fontWeight: FontWeight.w800)),
-                  trailing: m == selectedMonth ? const Icon(Icons.check_circle) : null,
+                  title: Text(_formatMonthLabel(m),
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                  trailing:
+                  m == selectedMonth ? const Icon(Icons.check_circle) : null,
                   onTap: () => Navigator.pop(context, m),
                 ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Anulo')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Anulo')),
         ],
       ),
     );
@@ -169,10 +234,13 @@ class _AdminScreenState extends State<AdminScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Gabim', style: TextStyle(fontWeight: FontWeight.w900)),
+        title:
+        const Text('Gabim', style: TextStyle(fontWeight: FontWeight.w900)),
         content: Text(msg),
         actions: [
-          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK')),
         ],
       ),
     );
@@ -187,7 +255,8 @@ class _AdminScreenState extends State<AdminScreen> {
       context: context,
       barrierDismissible: true,
       builder: (ctx) => AlertDialog(
-        title: const Text('Blej Mall (Investim)', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text('Blej Mall (Investim)',
+            style: TextStyle(fontWeight: FontWeight.w900)),
         content: SizedBox(
           width: 520,
           child: Column(
@@ -195,7 +264,8 @@ class _AdminScreenState extends State<AdminScreen> {
             children: [
               TextField(
                 controller: amountC,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
                   labelText: 'Amount (€)',
                   border: OutlineInputBorder(),
@@ -213,7 +283,9 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Anulo')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Anulo')),
           FilledButton.icon(
             onPressed: saving
                 ? null
@@ -260,7 +332,8 @@ class _AdminScreenState extends State<AdminScreen> {
       barrierDismissible: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('Shto Shpenzim', style: TextStyle(fontWeight: FontWeight.w900)),
+          title: const Text('Shto Shpenzim',
+              style: TextStyle(fontWeight: FontWeight.w900)),
           content: SizedBox(
             width: 520,
             child: Column(
@@ -271,7 +344,8 @@ class _AdminScreenState extends State<AdminScreen> {
                   items: expCategories
                       .map((c) => DropdownMenuItem(
                     value: c,
-                    child: Text(c, style: const TextStyle(fontWeight: FontWeight.w800)),
+                    child: Text(c,
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
                   ))
                       .toList(),
                   onChanged: (v) {
@@ -286,7 +360,8 @@ class _AdminScreenState extends State<AdminScreen> {
                 const SizedBox(height: 10),
                 TextField(
                   controller: expAmountC,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
                     labelText: 'Amount (€)',
                     border: OutlineInputBorder(),
@@ -296,8 +371,12 @@ class _AdminScreenState extends State<AdminScreen> {
                 TextField(
                   controller: expNoteC,
                   decoration: InputDecoration(
-                    labelText: expCategory == 'Rroga' ? 'Emri i punëtorit / shënim' : 'Shënim (opsional)',
-                    hintText: expCategory == 'Rroga' ? 'p.sh. Arben - Rroga Janar' : null,
+                    labelText: expCategory == 'Rroga'
+                        ? 'Emri i punëtorit / shënim'
+                        : 'Shënim (opsional)',
+                    hintText: expCategory == 'Rroga'
+                        ? 'p.sh. Arben - Rroga Janar'
+                        : null,
                     border: const OutlineInputBorder(),
                   ),
                 ),
@@ -305,7 +384,9 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Anulo')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Anulo')),
             FilledButton.icon(
               onPressed: expSaving
                   ? null
@@ -344,10 +425,285 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
+  // =======================
+  // ✅ PRINT / SAVE PDF
+  // =======================
+
+  Future<void> _printOrSaveReport(_ReportScope scope,
+      {required bool saveAsPdf}) async {
+    final s = stats;
+    if (s == null) {
+      _showError('S’ka statistika për me bo raport.');
+      return;
+    }
+
+    final year = _selectedYear();
+    final today = DateTime.now();
+
+    double sales = 0, profit = 0, invest = 0, exp = 0;
+    int countSales = 0;
+
+    switch (scope) {
+      case _ReportScope.day:
+        sales = (s.totalSalesToday ?? 0).toDouble();
+        profit = (s.totalProfitToday ?? 0).toDouble();
+        invest = (s.totalInvestToday ?? 0).toDouble();
+        exp = (s.totalExpensesToday ?? 0).toDouble();
+        countSales = (s.countSalesToday ?? 0);
+        break;
+
+      case _ReportScope.month:
+        sales = (s.totalSalesMonth ?? 0).toDouble();
+        profit = (s.totalProfitMonth ?? 0).toDouble();
+        invest = (s.totalInvestMonth ?? 0).toDouble();
+        exp = (s.totalExpensesMonth ?? 0).toDouble();
+        countSales = (s.countSalesMonth ?? 0);
+        break;
+
+      case _ReportScope.total:
+        sales = (s.totalSalesAll ?? 0).toDouble();
+        profit = (s.totalProfitAll ?? 0).toDouble();
+        invest = (s.totalInvestAll ?? 0).toDouble();
+        exp = (s.totalExpensesAll ?? 0).toDouble();
+        countSales = (s.countSalesAll ?? 0);
+        break;
+
+      case _ReportScope.year:
+      // ⚠️ PLACEHOLDER: duhet query vjetor nga DB/API
+        sales = 0;
+        profit = 0;
+        invest = 0;
+        exp = 0;
+        countSales = 0;
+        break;
+    }
+
+    final net = profit - exp;
+
+    final bytes = await _buildPdfBytes(
+      scope: scope,
+      today: today,
+      year: year,
+      sales: sales,
+      profit: profit,
+      invest: invest,
+      expenses: exp,
+      countSales: countSales,
+      net: net,
+      activity: activity,
+    );
+
+    if (saveAsPdf) {
+      await _savePdfFile(bytes, scope);
+      return;
+    }
+
+    await Printing.layoutPdf(
+      onLayout: (_) async => bytes,
+      name: _pdfFileName(scope),
+    );
+  }
+
+  Future<void> _savePdfFile(Uint8List bytes, _ReportScope scope) async {
+    final suggestedName = _pdfFileName(scope);
+
+    final FileSaveLocation? location = await getSaveLocation(
+      suggestedName: suggestedName,
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'PDF', extensions: ['pdf']),
+      ],
+    );
+
+    if (location == null) return;
+
+    final file = XFile.fromData(
+      bytes,
+      name: suggestedName,
+      mimeType: 'application/pdf',
+    );
+
+    await file.saveTo(location.path);
+
+    if (!mounted) return;
+    await _showSuccessDialog('PDF u ruajt ✅');
+  }
+
+  Future<Uint8List> _buildPdfBytes({
+    required _ReportScope scope,
+    required DateTime today,
+    required int year,
+    required double sales,
+    required double profit,
+    required double invest,
+    required double expenses,
+    required int countSales,
+    required double net,
+    required List<ActivityItem> activity,
+  }) async {
+    final doc = pw.Document();
+
+    final font = await PdfGoogleFonts.interRegular();
+    final fontBold = await PdfGoogleFonts.interBold();
+
+    String pad2(int n) => n.toString().padLeft(2, '0');
+    final dateLabel = '${pad2(today.day)}.${pad2(today.month)}.${today.year}';
+
+    String periodLabel;
+    switch (scope) {
+      case _ReportScope.day:
+        periodLabel = 'Dita: $dateLabel';
+        break;
+      case _ReportScope.month:
+        periodLabel = 'Muaji: ${_formatMonthLabel(selectedMonth)}';
+        break;
+      case _ReportScope.year:
+        periodLabel = 'Viti: $year';
+        break;
+      case _ReportScope.total:
+        periodLabel = 'Gjithsej (Total)';
+        break;
+    }
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (ctx) => [
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(_scopeTitle(scope),
+                      style: pw.TextStyle(font: fontBold, fontSize: 18)),
+                  pw.SizedBox(height: 4),
+                  pw.Text(periodLabel,
+                      style: pw.TextStyle(font: font, fontSize: 11)),
+                  pw.Text('Gjeneruar: $dateLabel',
+                      style: pw.TextStyle(font: font, fontSize: 10)),
+                ],
+              ),
+              pw.Container(
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(width: 0.8),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Text('Shoe Store Manager',
+                    style: pw.TextStyle(font: fontBold, fontSize: 11)),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(12),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(width: 0.8),
+              borderRadius: pw.BorderRadius.circular(10),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Përmbledhje',
+                    style: pw.TextStyle(font: fontBold, fontSize: 13)),
+                pw.SizedBox(height: 10),
+                _pdfLine(font, fontBold, 'Shitje', _money(sales)),
+                _pdfLine(font, fontBold, 'Fitim', _money(profit)),
+                _pdfLine(font, fontBold, 'Investim', _money(invest)),
+                _pdfLine(font, fontBold, 'Shpenzime', _money(expenses)),
+                _pdfLine(font, fontBold, 'Nr. shitjesh', '$countSales'),
+                pw.Divider(),
+                _pdfLine(font, fontBold, 'Neto (Fitim - Shpenzime)', _money(net)),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 14),
+          if (scope == _ReportScope.year)
+            pw.Container(
+              padding: const pw.EdgeInsets.all(10),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(width: 0.8),
+                borderRadius: pw.BorderRadius.circular(10),
+              ),
+              child: pw.Text(
+                '⚠️ Raporti vjetor ende s’është lidhur me query vjetore në DB/API. '
+                    'Tabela poshtë shfaq “Regjistrimet e fundit” (si në ekran).',
+                style: pw.TextStyle(font: font, fontSize: 10),
+              ),
+            ),
+          pw.SizedBox(height: 14),
+          pw.Text('Regjistrimet e fundit (si në Admin)',
+              style: pw.TextStyle(font: fontBold, fontSize: 13)),
+          pw.SizedBox(height: 8),
+          pw.Table(
+            border: pw.TableBorder.all(width: 0.6),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(1.1),
+              1: const pw.FlexColumnWidth(2.2),
+              2: const pw.FlexColumnWidth(2.8),
+              3: const pw.FlexColumnWidth(1.2),
+            },
+            children: [
+              pw.TableRow(
+                children: [
+                  _pdfCellHeader(fontBold, 'Tipi'),
+                  _pdfCellHeader(fontBold, 'Titulli'),
+                  _pdfCellHeader(fontBold, 'Detaj'),
+                  _pdfCellHeader(fontBold, 'Shuma'),
+                ],
+              ),
+              ...activity.take(60).map((a) {
+                final sign = (a.type == 'SALE') ? '+' : '-';
+                return pw.TableRow(
+                  children: [
+                    _pdfCell(font, a.type),
+                    _pdfCell(font, a.title),
+                    _pdfCell(font, a.sub),
+                    _pdfCell(font, '$sign${_money(a.amount)}'),
+                  ],
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    return doc.save();
+  }
+
+  pw.Widget _pdfLine(pw.Font f, pw.Font fb, String k, String v) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 3),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(k, style: pw.TextStyle(font: fb, fontSize: 11)),
+          pw.Text(v, style: pw.TextStyle(font: f, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _pdfCellHeader(pw.Font fb, String t) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(6),
+      child: pw.Text(t, style: pw.TextStyle(font: fb, fontSize: 10)),
+    );
+  }
+
+  pw.Widget _pdfCell(pw.Font f, String t) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.all(6),
+      child: pw.Text(t, style: pw.TextStyle(font: f, fontSize: 9)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = stats;
-
     final today = DateTime.now();
 
     final salesToday = (s?.totalSalesToday ?? 0).toDouble();
@@ -374,6 +730,29 @@ class _AdminScreenState extends State<AdminScreen> {
       appBar: AppBar(
         title: const Text('Admin Panel'),
         actions: [
+          // ✅ PRINT MENU
+          PopupMenuButton<_ReportScope>(
+            tooltip: 'Print / PDF',
+            icon: const Icon(Icons.print),
+            onSelected: (scope) async {
+              await _printOrSaveReport(scope, saveAsPdf: false);
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: _ReportScope.day, child: Text('Print Dita (Sot)')),
+              PopupMenuItem(value: _ReportScope.month, child: Text('Print Muaji (i zgjedhur)')),
+              PopupMenuItem(value: _ReportScope.year, child: Text('Print Viti (i zgjedhur)')),
+              PopupMenuItem(value: _ReportScope.total, child: Text('Print Total (Gjithsej)')),
+            ],
+          ),
+
+          IconButton(
+            tooltip: 'Ruaj si PDF (Muaji)',
+            icon: const Icon(Icons.picture_as_pdf),
+            onPressed: () async {
+              await _printOrSaveReport(_ReportScope.month, saveAsPdf: true);
+            },
+          ),
+
           IconButton(
             tooltip: 'Expenses',
             onPressed: _openExpenseDialog,
@@ -406,7 +785,6 @@ class _AdminScreenState extends State<AdminScreen> {
                 onTap: _changeMonth,
               ),
             ),
-
             const SizedBox(height: 10),
 
             // Stats (SOT / MUAJ / TOTAL)
@@ -421,7 +799,6 @@ class _AdminScreenState extends State<AdminScreen> {
                       style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                     ),
                     const SizedBox(height: 10),
-
                     _tripleHeader(
                       left: 'SOT • ${_formatDayLabel(today)}',
                       mid: _formatMonthLabel(selectedMonth),
@@ -491,9 +868,14 @@ class _AdminScreenState extends State<AdminScreen> {
                       spacing: 10,
                       runSpacing: 10,
                       children: [
-                        _statCard('Stok Total (Copë)', '${s?.totalStock ?? 0}', Icons.inventory_2),
-                        _statCard('Vlera e Stokut (Final)', _money((s?.totalStockValueFinal ?? 0).toDouble()),
-                            Icons.euro, tint: Colors.green),
+                        _statCard('Stok Total (Copë)', '${s?.totalStock ?? 0}',
+                            Icons.inventory_2),
+                        _statCard(
+                          'Vlera e Stokut (Final)',
+                          _money((s?.totalStockValueFinal ?? 0).toDouble()),
+                          Icons.euro,
+                          tint: Colors.green,
+                        ),
                       ],
                     ),
                   ],
@@ -503,7 +885,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
             const SizedBox(height: 14),
 
-            // Quick actions (buttons)
+            // Quick actions
             Row(
               children: [
                 Expanded(
@@ -551,7 +933,9 @@ class _AdminScreenState extends State<AdminScreen> {
                 final isInvest = a.type == 'INVEST';
                 final isExpense = a.type == 'EXPENSE';
 
-                final c = isSale ? Colors.green : (isExpense ? Colors.deepOrange : Colors.red);
+                final c = isSale
+                    ? Colors.green
+                    : (isExpense ? Colors.deepOrange : Colors.red);
                 final sign = isSale ? '+' : '-';
 
                 final icon = isSale
@@ -564,7 +948,8 @@ class _AdminScreenState extends State<AdminScreen> {
                       backgroundColor: c.withOpacity(0.15),
                       child: Icon(icon, color: c),
                     ),
-                    title: Text(a.title, style: const TextStyle(fontWeight: FontWeight.w900)),
+                    title: Text(a.title,
+                        style: const TextStyle(fontWeight: FontWeight.w900)),
                     subtitle: Text(a.sub),
                     trailing: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -576,7 +961,9 @@ class _AdminScreenState extends State<AdminScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          DateTime.fromMillisecondsSinceEpoch(a.createdAtMs).toLocal().toString(),
+                          DateTime.fromMillisecondsSinceEpoch(a.createdAtMs)
+                              .toLocal()
+                              .toString(),
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontWeight: FontWeight.w600,
@@ -650,8 +1037,13 @@ class _AdminScreenState extends State<AdminScreen> {
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.45),
-            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.7)),
+            color: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withOpacity(0.45),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.7),
+            ),
           ),
           child: Text(
             v,
@@ -696,11 +1088,15 @@ class _AdminScreenState extends State<AdminScreen> {
                 children: [
                   Icon(icon, color: c),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800))),
+                  Expanded(
+                      child: Text(title,
+                          style: const TextStyle(fontWeight: FontWeight.w800))),
                 ],
               ),
               const SizedBox(height: 10),
-              Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: c)),
+              Text(value,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w900, fontSize: 18, color: c)),
             ],
           ),
         ),
@@ -745,8 +1141,11 @@ class _SuccessPopup extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.6)),
-        boxShadow: const [BoxShadow(blurRadius: 18, spreadRadius: 2, color: Color(0x33000000))],
+        border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.6)),
+        boxShadow: const [
+          BoxShadow(blurRadius: 18, spreadRadius: 2, color: Color(0x33000000))
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

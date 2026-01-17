@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart'; // ✅ add this
+import 'package:file_picker/file_picker.dart';
 import '../local/local_api.dart';
 
 class ProductsScreen extends StatefulWidget {
@@ -20,6 +20,45 @@ class _ProductsScreenState extends State<ProductsScreen> {
     _load();
   }
 
+  bool _hasValidImage(String? path) {
+    if (path == null) return false;
+    final t = path.trim();
+    if (t.isEmpty) return false;
+    return File(t).existsSync();
+  }
+
+  Widget _thumb(Product p) {
+    final path = p.imagePath?.trim();
+    final ok = _hasValidImage(path);
+
+    if (ok) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.file(
+          File(path!),
+          width: 44,
+          height: 44,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _placeholderThumb(),
+        ),
+      );
+    }
+    return _placeholderThumb();
+  }
+
+  Widget _placeholderThumb() {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.black12,
+      ),
+      alignment: Alignment.center,
+      child: const Icon(Icons.inventory_2_outlined),
+    );
+  }
+
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
@@ -28,7 +67,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
       setState(() => _items = list);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gabim: $e')),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -50,7 +91,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
         title: const Text('Fshij produktin?'),
         content: Text('A je i sigurt me fshi "${p.name}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Anulo')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Anulo'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Fshije'),
@@ -64,11 +108,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
     try {
       await LocalApi.I.deleteProduct(p.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Produkti u fshi.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Produkti u fshi.')),
+      );
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gabim: $e')),
+      );
     }
   }
 
@@ -78,7 +126,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gabim: $e')),
+      );
     }
   }
 
@@ -108,31 +158,29 @@ class _ProductsScreenState extends State<ProductsScreen> {
         itemBuilder: (_, i) {
           final p = _items[i];
           final hasDisc = p.discountPercent > 0;
+
           return Card(
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.black12,
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.inventory_2_outlined),
-                  ),
+                  _thumb(p), // ✅ PHOTO thumb
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800)),
+                        Text(
+                          p.name,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           p.serialNumber ?? p.sku ?? '—',
-                          style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 6),
                         Wrap(
@@ -141,7 +189,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           children: [
                             _pill('Stok: ${p.stockQty}', p.stockQty > 0 ? Colors.green : Colors.red),
                             _pill(p.active ? 'Active' : 'OFF', p.active ? Colors.green : Colors.grey),
-                            if (hasDisc) _pill('-${p.discountPercent.toStringAsFixed(0)}%', Colors.orange),
+                            if (hasDisc)
+                              _pill('-${p.discountPercent.toStringAsFixed(0)}%', Colors.orange),
                           ],
                         ),
                       ],
@@ -267,7 +316,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // ✅ OPEN FILE PICKER (desktop window + mobile gallery chooser)
   Future<void> _pickImage() async {
     try {
       final res = await FilePicker.platform.pickFiles(
@@ -305,7 +353,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     final stock = _parseInt(stockC.text);
     final disc = _parseDouble(discountC.text);
 
-    // ✅ store as NULL if empty
     final imgRaw = imagePathC.text.trim();
     final img = imgRaw.isEmpty ? null : imgRaw;
 
@@ -440,7 +487,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 10),
 
                 // ✅ ImagePath + Choose file button + preview

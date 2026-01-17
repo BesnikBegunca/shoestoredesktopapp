@@ -5,14 +5,15 @@ List<ReceiptLine> buildReceiptLines({
   required DateTime date,
   required String productName,
   required int qty,
-  required double unitPriceFinal,        // final (pas zbritjes)
-  required double totalFinal,            // total final
-  double unitPriceOriginal = 0,          // origjinal para zbritjes
-  double discountPercent = 0,            // p.sh 10
-  int? size,                             // opsionale
+  required double unitPriceFinal,
+  required double totalFinal,
+  double unitPriceOriginal = 0,
+  double discountPercent = 0,
+  int? size,
 }) {
   String pad2(int n) => n.toString().padLeft(2, '0');
-  String dateStr = '${pad2(date.day)}.${pad2(date.month)}.${date.year} ${pad2(date.hour)}:${pad2(date.minute)}';
+  String dateStr =
+      '${pad2(date.day)}.${pad2(date.month)}.${date.year} ${pad2(date.hour)}:${pad2(date.minute)}';
 
   String money(double v) => '€${v.toStringAsFixed(2)}';
 
@@ -34,7 +35,9 @@ List<ReceiptLine> buildReceiptLines({
 
   if (hasDiscount) {
     lines.add(ReceiptLine('Cmimi origjinal', money(unitPriceOriginal)));
-    lines.add(ReceiptLine('Zbritja', '-${discountPercent.toStringAsFixed(0)}%'));
+    lines.add(
+      ReceiptLine('Zbritja', '-${discountPercent.toStringAsFixed(0)}%'),
+    );
     lines.add(ReceiptLine('Cmimi final', money(unitPriceFinal), bold: true));
   } else {
     lines.add(ReceiptLine('Cmimi', money(unitPriceFinal), bold: true));

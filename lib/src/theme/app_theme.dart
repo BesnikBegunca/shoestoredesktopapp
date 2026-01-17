@@ -1,27 +1,25 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Dark theme with custom color palette
-  static const bg = Color(0xFF1C2F4A); // kaltër i qeltë profesional
-  // Dark navy background
-  static const surface = Color(0xFF223A5E);
-  // Dark blue surface
-  static const surface2 = Color(0xFF0F3460); // Darker blue surface
-  static const stroke = Color.fromRGBO(255, 255, 255, 0.1); // Light border
-  static const text = Color(0xFFE9ECEF); // Light gray text
-  static const muted = Color.fromRGBO(233, 236, 239, 0.7); // Muted light text
-  static const subtle = Color.fromRGBO(233, 236, 239, 0.5); // Subtle light text
+  static const bg = Color(0xFF1C2F4A);
 
-  // Custom vibrant color palette
-  static const success = Color(0xFF4CAF50); // Green for success
-  static const delete = Color(0xFFF44336); // Red for delete
-  static const warning = Color(0xFFFF9800); // Orange for warnings
-  static const info = Color(0xFF2196F3); // Blue for info
-  static const accent = Color(0xFFF72585); // Custom pink accent
-  static const primaryPurple = Color(0xFF7209B7); // Custom purple
-  static const darkPurple = Color(0xFF3A0CA3); // Custom dark purple
-  static const blueAccent = Color(0xFF4361EE); // Custom blue
-  static const cyanAccent = Color(0xFF4CC9F0); // Custom cyan
+  static const surface = Color(0xFF223A5E);
+
+  static const surface2 = Color(0xFF0F3460);
+  static const stroke = Color.fromRGBO(255, 255, 255, 0.1);
+  static const text = Color(0xFFE9ECEF);
+  static const muted = Color.fromRGBO(233, 236, 239, 0.7);
+  static const subtle = Color.fromRGBO(233, 236, 239, 0.5);
+
+  static const success = Color(0xFF4CAF50);
+  static const delete = Color(0xFFF44336);
+  static const warning = Color(0xFFFF9800);
+  static const info = Color(0xFF2196F3);
+  static const accent = Color(0xFFF72585);
+  static const primaryPurple = Color(0xFF7209B7);
+  static const darkPurple = Color(0xFF3A0CA3);
+  static const blueAccent = Color(0xFF4361EE);
+  static const cyanAccent = Color(0xFF4CC9F0);
 
   static ThemeData dark() {
     return ThemeData(

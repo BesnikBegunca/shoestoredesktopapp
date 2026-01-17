@@ -1,10 +1,17 @@
-# TODO: Change App Theme to Bright, Success Green, Delete Red, More Beautiful
-
-## Tasks
-- [ ] Modify app_theme.dart to create a bright light theme with appropriate colors
-- [ ] Update app.dart to use the new light theme instead of dark
-- [ ] Update success buttons to green in main_screen.dart (sell button)
-- [ ] Update success buttons to green in products_screen.dart (save/add button)
-- [ ] Update delete buttons to red in products_screen.dart (delete confirm button and icon)
-- [ ] Update buttons in admin_screen.dart (invest green as success, expense red as delete-like)
-- [ ] Enhance overall beauty with subtle improvements (colors, styling) without changing functions
+- [x] Remove comments from lib/main.dart
+- [x] Remove comments from lib/auth/role_store.dart
+- [ ] Remove comments from lib/printing/receipt_builder.dart
+- [x] Remove comments from lib/printing/receipt_pdf_80mm.dart
+- [x] Remove comments from lib/printing/receipt_preview.dart
+- [ ] Remove comments from lib/src/app.dart
+- [x] Remove comments from lib/src/db/app_db.dart
+- [ ] Remove comments from lib/src/db/schema.dart
+- [ ] Remove comments from lib/src/local/local_api.dart
+- [ ] Remove comments from lib/src/screens/admin_screen.dart
+- [ ] Remove comments from lib/src/screens/app_shell.dart
+- [ ] Remove comments from lib/src/screens/boot_gate.dart
+- [ ] Remove comments from lib/src/screens/login_screen.dart
+- [ ] Remove comments from lib/src/screens/main_screen.dart
+- [x] Remove comments from lib/src/screens/products_screen.dart
+- [ ] Remove comments from lib/src/screens/settings_screen.dart
+- [x] Remove comments from lib/src/theme/app_theme.dart

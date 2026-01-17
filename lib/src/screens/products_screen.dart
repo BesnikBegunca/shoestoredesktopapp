@@ -70,8 +70,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
       setState(() => _items = list);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gabim: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -110,13 +111,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
     try {
       await LocalApi.I.deleteProduct(p.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Produkti u fshi.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Produkti u fshi.')));
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gabim: $e')));
     }
   }
 
@@ -126,8 +129,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gabim: $e')));
     }
   }
 
@@ -151,114 +155,116 @@ class _ProductsScreenState extends State<ProductsScreen> {
           : _items.isEmpty
           ? const Center(child: Text('S’ka produkte ende.'))
           : ListView.separated(
-        padding: const EdgeInsets.all(12),
-        itemCount: _items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (_, i) {
-          final p = _items[i];
-          final hasDisc = p.discountPercent > 0;
-
-          return Card(
-            child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  _thumb(p),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              itemCount: _items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) {
+                final p = _items[i];
+                final hasDisc = p.discountPercent > 0;
+
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
                       children: [
-                        Text(
-                          p.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          p.serialNumber ?? p.sku ?? '—',
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: [
-                            _pill(
-                              'Stok: ${p.stockQty}',
-                              p.stockQty > 0 ? Colors.green : Colors.red,
-                            ),
-                            _pill(
-                              p.active ? 'Active' : 'OFF',
-                              p.active ? Colors.green : Colors.grey,
-                            ),
-                            if (hasDisc)
-                              _pill(
-                                '-${p.discountPercent.toStringAsFixed(0)}%',
-                                Colors.orange,
+                        _thumb(p),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                p.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
+                              const SizedBox(height: 4),
+                              Text(
+                                p.serialNumber ?? p.sku ?? '—',
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: [
+                                  _pill(
+                                    'Stok: ${p.stockQty}',
+                                    p.stockQty > 0 ? Colors.green : Colors.red,
+                                  ),
+                                  _pill(
+                                    p.active ? 'Active' : 'OFF',
+                                    p.active ? Colors.green : Colors.grey,
+                                  ),
+                                  if (hasDisc)
+                                    _pill(
+                                      '-${p.discountPercent.toStringAsFixed(0)}%',
+                                      Colors.orange,
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              _sizesInline(p),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            if (hasDisc)
+                              Text(
+                                '€${p.price.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  decoration: TextDecoration.lineThrough,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            Text(
+                              '€${p.finalPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Active',
+                                  onPressed: () => _toggleActive(p),
+                                  icon: Icon(
+                                    p.active
+                                        ? Icons.toggle_on
+                                        : Icons.toggle_off,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Edit',
+                                  onPressed: () => _openForm(editing: p),
+                                  icon: const Icon(Icons.edit),
+                                ),
+                                IconButton(
+                                  tooltip: 'Delete',
+                                  onPressed: () => _confirmDelete(p),
+                                  icon: const Icon(Icons.delete_outline),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        _sizesInline(p),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (hasDisc)
-                        Text(
-                          '€${p.price.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            decoration: TextDecoration.lineThrough,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      Text(
-                        '€${p.finalPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            tooltip: 'Active',
-                            onPressed: () => _toggleActive(p),
-                            icon: Icon(
-                              p.active ? Icons.toggle_on : Icons.toggle_off,
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Edit',
-                            onPressed: () => _openForm(editing: p),
-                            icon: const Icon(Icons.edit),
-                          ),
-                          IconButton(
-                            tooltip: 'Delete',
-                            onPressed: () => _confirmDelete(p),
-                            icon: const Icon(Icons.delete_outline),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 
@@ -269,13 +275,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return Wrap(
       spacing: 6,
       runSpacing: 6,
-      children: [
-        for (final s in sizes)
-          _sizeChip(
-            s,
-            p.qtyForSize(s),
-          ),
-      ],
+      children: [for (final s in sizes) _sizeChip(s, p.qtyForSize(s))],
     );
   }
 
@@ -291,11 +291,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       ),
       child: Text(
         '$size: $qty',
-        style: TextStyle(
-          color: c,
-          fontWeight: FontWeight.w900,
-          fontSize: 12,
-        ),
+        style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 12),
       ),
     );
   }
@@ -335,13 +331,11 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   late final TextEditingController discountC;
   late final TextEditingController imagePathC;
 
-  // ✅ sizes: key=size, value=qty
   late Map<int, TextEditingController> sizeCtrls;
 
   bool active = true;
   bool saving = false;
 
-  // default range for shoes
   static const int minSize = 36;
   static const int maxSize = 47;
 
@@ -355,7 +349,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     serialC = TextEditingController(text: p?.serialNumber ?? '');
     priceC = TextEditingController(text: p == null ? '' : p.price.toString());
     purchaseC = TextEditingController(text: p?.purchasePrice?.toString() ?? '');
-    discountC = TextEditingController(text: p?.discountPercent.toString() ?? '0');
+    discountC = TextEditingController(
+      text: p?.discountPercent.toString() ?? '0',
+    );
     imagePathC = TextEditingController(text: p?.imagePath ?? '');
     active = p?.active ?? true;
 
@@ -363,7 +359,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     final existing = p?.sizeStock ?? {};
     sizeCtrls = {
       for (int s = minSize; s <= maxSize; s++)
-        s: TextEditingController(text: (existing[s] ?? 0).toString())
+        s: TextEditingController(text: (existing[s] ?? 0).toString()),
     };
   }
 
@@ -420,14 +416,15 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     sizeCtrls.forEach((size, ctrl) {
       final q = _parseInt(ctrl.text);
       if (q < 0) return; // ignore negative, will validate later
-      if (q > 0) out[size] = q;
-      else out[size] = 0;
+      if (q > 0)
+        out[size] = q;
+      else
+        out[size] = 0;
     });
     return out;
   }
 
-  int _totalStock(Map<int, int> m) =>
-      m.values.fold(0, (a, b) => a + b);
+  int _totalStock(Map<int, int> m) => m.values.fold(0, (a, b) => a + b);
 
   Future<void> _save() async {
     if (saving) return;
@@ -535,7 +532,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     hintText: 'p.sh. Nike Air Max',
                   ),
                   validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Shkruje emrin.' : null,
+                      (v == null || v.trim().isEmpty) ? 'Shkruje emrin.' : null,
                 ),
                 const SizedBox(height: 10),
                 Row(
@@ -590,14 +587,13 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: discountC,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Zbritja (%)',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
+                  decoration: const InputDecoration(labelText: 'Zbritja (%)'),
                 ),
                 const SizedBox(height: 14),
 
-                // ✅ STOCK by SIZE editor
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Row(
@@ -616,7 +612,6 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
                 const SizedBox(height: 14),
 
-                // ✅ ImagePath + Choose file button + preview
                 Row(
                   children: [
                     Expanded(
@@ -652,7 +647,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                           File(imgPath),
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) =>
-                          const Center(child: Icon(Icons.broken_image)),
+                              const Center(child: Icon(Icons.broken_image)),
                         ),
                       ),
                     ),

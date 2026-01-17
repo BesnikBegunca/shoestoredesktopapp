@@ -182,7 +182,7 @@ class _MainScreenState extends State<MainScreen> {
                   crossAxisCount: 4,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.2,
+                  childAspectRatio: 0.9,
                 ),
                 itemCount: results.length,
                 itemBuilder: (_, i) => _productCard(results[i]),

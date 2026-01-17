@@ -1,7 +1,15 @@
+// main_screen.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shoe_store_manager/auth/role_store.dart';
+import 'package:shoe_store_manager/printing/receipt_builder.dart';
+import 'package:shoe_store_manager/printing/receipt_pdf_80mm.dart';
+import 'package:shoe_store_manager/printing/receipt_preview.dart';
+import 'package:shoe_store_manager/src/screens/login_screen.dart';
+
 import '../local/local_api.dart';
+import '../theme/app_theme.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -47,7 +55,11 @@ class _MainScreenState extends State<MainScreen> {
         File(path!),
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => Center(
-          child: Icon(Icons.broken_image, size: 58, color: Colors.black.withOpacity(0.35)),
+          child: Icon(
+            Icons.broken_image,
+            size: 58,
+            color: Colors.black.withOpacity(0.35),
+          ),
         ),
       );
     }
@@ -72,7 +84,8 @@ class _MainScreenState extends State<MainScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Gabim: $e')));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -104,7 +117,8 @@ class _MainScreenState extends State<MainScreen> {
       setState(() => results = list);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Gabim: $e')));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -134,6 +148,19 @@ class _MainScreenState extends State<MainScreen> {
             onPressed: () => _search(qC.text),
             icon: const Icon(Icons.refresh),
           ),
+          IconButton(
+            tooltip: 'Logout',
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await RoleStore.clear();
+              if (!context.mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (_) => false,
+              );
+            },
+          ),
           const SizedBox(width: 6),
         ],
       ),
@@ -150,11 +177,12 @@ class _MainScreenState extends State<MainScreen> {
                   ? const Center(child: Text('S’ka rezultate.'))
                   : GridView.builder(
                 padding: const EdgeInsets.only(bottom: 12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.0,
+                  childAspectRatio: 1.2,
                 ),
                 itemCount: results.length,
                 itemBuilder: (_, i) => _productCard(results[i]),
@@ -220,23 +248,22 @@ class _MainScreenState extends State<MainScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ===== PHOTO (big) =====
             Container(
               height: 170,
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.06),
-              ),
+              decoration: BoxDecoration(color: Colors.black.withOpacity(0.06)),
               child: Stack(
                 children: [
-                  Positioned.fill(child: _photoBox(p)), // ✅ REAL PHOTO
-
+                  Positioned.fill(child: _photoBox(p)),
                   if (hasDisc)
                     Positioned(
                       top: 10,
                       right: 10,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.orange.withOpacity(0.90),
                           borderRadius: BorderRadius.circular(999),
@@ -253,8 +280,6 @@ class _MainScreenState extends State<MainScreen> {
                 ],
               ),
             ),
-
-            // ===== ATTRIBUTES (below) =====
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
@@ -271,7 +296,10 @@ class _MainScreenState extends State<MainScreen> {
                               p.name,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                              ),
                             ),
                             const SizedBox(height: 6),
                             Text(
@@ -285,7 +313,6 @@ class _MainScreenState extends State<MainScreen> {
                         ),
                       ),
                       const SizedBox(width: 10),
-
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -300,27 +327,30 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                           Text(
                             '€${fp.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                            ),
                           ),
                         ],
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 10),
-
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
                       _pill('Stok: ${p.stockQty}', stockColor),
                       _pill(p.active ? 'Active' : 'OFF', activeColor),
-                      if (hasDisc) _pill('-${p.discountPercent.toStringAsFixed(0)}%', Colors.orange),
+                      if (hasDisc)
+                        _pill(
+                          '-${p.discountPercent.toStringAsFixed(0)}%',
+                          Colors.orange,
+                        ),
                     ],
                   ),
-
                   const SizedBox(height: 10),
-
                   Text(
                     'Kliko për detaje',
                     style: TextStyle(
@@ -346,7 +376,10 @@ class _MainScreenState extends State<MainScreen> {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: c.withOpacity(0.35)),
       ),
-      child: Text(t, style: TextStyle(color: c, fontWeight: FontWeight.w800, fontSize: 12)),
+      child: Text(
+        t,
+        style: TextStyle(color: c, fontWeight: FontWeight.w800, fontSize: 12),
+      ),
     );
   }
 }
@@ -357,10 +390,7 @@ class _ProductDialog extends StatefulWidget {
   final Product product;
   final Future<void> Function() onSold;
 
-  const _ProductDialog({
-    required this.product,
-    required this.onSold,
-  });
+  const _ProductDialog({required this.product, required this.onSold});
 
   @override
   State<_ProductDialog> createState() => _ProductDialogState();
@@ -372,16 +402,33 @@ class _ProductDialogState extends State<_ProductDialog> {
   String? soldInvoice;
   double? soldTotal;
 
+  int? selectedSize;
+
+  @override
+  void initState() {
+    super.initState();
+    // auto select first available size
+    final sizes = widget.product.sizesSorted;
+    for (final s in sizes) {
+      if (widget.product.qtyForSize(s) > 0) {
+        selectedSize = s;
+        break;
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
     final hasDisc = p.discountPercent > 0;
     final fp = p.finalPrice;
 
+    final sizes = p.sizesSorted;
+
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
+        constraints: const BoxConstraints(maxWidth: 620),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: AnimatedSwitcher(
@@ -398,11 +445,16 @@ class _ProductDialogState extends State<_ProductDialog> {
                     Expanded(
                       child: Text(
                         p.name,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                     IconButton(
-                      onPressed: selling ? null : () => Navigator.pop(context),
+                      onPressed: selling
+                          ? null
+                          : () => Navigator.pop(context),
                       icon: const Icon(Icons.close),
                     ),
                   ],
@@ -411,7 +463,35 @@ class _ProductDialogState extends State<_ProductDialog> {
                 _metaRow('Serial', p.serialNumber ?? '—'),
                 _metaRow('SKU', p.sku ?? '—'),
                 _metaRow('Status', p.active ? 'Active' : 'OFF'),
-                _metaRow('Stok', '${p.stockQty}'),
+                _metaRow('Total', '${p.stockQty}'),
+                const SizedBox(height: 12),
+                const Text(
+                  'Numrat / Stoku',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 8),
+
+                if (sizes.isEmpty)
+                  Text(
+                    'S’ka numra të regjistrum.',
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final s in sizes)
+                        _sizeSelectChip(
+                          size: s,
+                          qty: p.qtyForSize(s),
+                        ),
+                    ],
+                  ),
+
                 const SizedBox(height: 12),
                 const Divider(height: 1),
                 const SizedBox(height: 12),
@@ -425,19 +505,26 @@ class _ProductDialogState extends State<_ProductDialog> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
                           color: Colors.black.withOpacity(0.04),
-                          border: Border.all(color: Colors.black.withOpacity(0.08)),
+                          border: Border.all(
+                            color: Colors.black.withOpacity(0.08),
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Çmimi', style: TextStyle(fontWeight: FontWeight.w900)),
+                            const Text(
+                              'Çmimi',
+                              style:
+                              TextStyle(fontWeight: FontWeight.w900),
+                            ),
                             const SizedBox(height: 8),
                             if (hasDisc)
                               Text(
                                 '€${p.price.toStringAsFixed(2)}',
                                 style: TextStyle(
                                   color: Colors.grey.shade700,
-                                  decoration: TextDecoration.lineThrough,
+                                  decoration:
+                                  TextDecoration.lineThrough,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -445,23 +532,46 @@ class _ProductDialogState extends State<_ProductDialog> {
                               children: [
                                 Text(
                                   '€${fp.toStringAsFixed(2)}',
-                                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                                 const SizedBox(width: 10),
                                 if (hasDisc)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.orange.withOpacity(0.14),
-                                      borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(color: Colors.orange.withOpacity(0.35)),
+                                      color: Colors.orange
+                                          .withOpacity(0.14),
+                                      borderRadius:
+                                      BorderRadius.circular(999),
+                                      border: Border.all(
+                                        color: Colors.orange
+                                            .withOpacity(0.35),
+                                      ),
                                     ),
                                     child: Text(
                                       '-${p.discountPercent.toStringAsFixed(0)}%',
-                                      style: const TextStyle(fontWeight: FontWeight.w900),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                     ),
                                   ),
                               ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              selectedSize == null
+                                  ? 'Zgjedh numrin për me shit.'
+                                  : 'Numri i zgjedhun: $selectedSize',
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ],
                         ),
@@ -476,7 +586,9 @@ class _ProductDialogState extends State<_ProductDialog> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: selling ? null : () => Navigator.pop(context),
+                        onPressed: selling
+                            ? null
+                            : () => Navigator.pop(context),
                         icon: const Icon(Icons.keyboard_return),
                         label: const Text('Mbyll'),
                       ),
@@ -484,15 +596,29 @@ class _ProductDialogState extends State<_ProductDialog> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: (selling || !p.active || p.stockQty <= 0) ? null : _doSell,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppTheme.success,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: (selling ||
+                            !p.active ||
+                            selectedSize == null ||
+                            (selectedSize != null &&
+                                p.qtyForSize(selectedSize!) <= 0))
+                            ? null
+                            : _doSell,
                         icon: selling
                             ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
                         )
                             : const Icon(Icons.point_of_sale),
-                        label: Text(selling ? 'Duke shitur...' : 'BLEJ / SHIT 1'),
+                        label: Text(
+                          selling ? 'Duke shitur...' : 'BLEJ / SHIT 1',
+                        ),
                       ),
                     ),
                   ],
@@ -501,13 +627,48 @@ class _ProductDialogState extends State<_ProductDialog> {
                 Text(
                   (!p.active)
                       ? 'Ky produkt është OFF.'
-                      : (p.stockQty <= 0)
-                      ? 'S’ka stok për këtë produkt.'
+                      : (selectedSize == null)
+                      ? 'Zgjedh numrin (size).'
+                      : (p.qtyForSize(selectedSize!) <= 0)
+                      ? 'S’ka stok për numrin $selectedSize.'
                       : 'Kliko “BLEJ” për me e regjistru shitjen.',
-                  style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sizeSelectChip({required int size, required int qty}) {
+    final ok = qty > 0;
+    final c = ok ? Colors.green : Colors.red;
+    final selected = selectedSize == size;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: ok ? () => setState(() => selectedSize = size) : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? c.withOpacity(0.22) : c.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? c.withOpacity(0.75) : c.withOpacity(0.35),
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Text(
+          '$size ($qty)',
+          style: TextStyle(
+            color: c,
+            fontWeight: FontWeight.w900,
+            fontSize: 12,
           ),
         ),
       ),
@@ -521,18 +682,30 @@ class _ProductDialogState extends State<_ProductDialog> {
         children: [
           SizedBox(
             width: 70,
-            child: Text(k, style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w800)),
+            child: Text(
+              k,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
-          Expanded(child: Text(v, style: const TextStyle(fontWeight: FontWeight.w900))),
+          Expanded(
+            child: Text(v, style: const TextStyle(fontWeight: FontWeight.w900)),
+          ),
         ],
       ),
     );
   }
 
   Future<void> _doSell() async {
+    final p = widget.product;
+    final size = selectedSize;
+    if (size == null) return;
+
     setState(() => selling = true);
     try {
-      final res = await LocalApi.I.sellOne(productId: widget.product.id);
+      final res = await LocalApi.I.sellOne(productId: p.id, size: size);
 
       await widget.onSold();
 
@@ -543,16 +716,19 @@ class _ProductDialogState extends State<_ProductDialog> {
         soldTotal = res.total;
       });
 
-      await Future.delayed(const Duration(milliseconds: 900));
-      if (mounted) Navigator.pop(context);
+      // ✅ MOS e mbyll automatikisht.
+      // Dialogu mbyllet vetëm kur klikon PRINT (ose mundesh me shtu “Mbyll” buton).
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('S’u shit: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('S’u shit: $e')));
       setState(() => selling = false);
     }
   }
 
   Widget _successView() {
+    final p = widget.product;
+
     return Column(
       key: const ValueKey('success'),
       mainAxisSize: MainAxisSize.min,
@@ -569,17 +745,100 @@ class _ProductDialogState extends State<_ProductDialog> {
           child: const Icon(Icons.check_circle, size: 46, color: Colors.green),
         ),
         const SizedBox(height: 14),
-        const Text('U shit me sukses ✅', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+        const Text(
+          'U shit me sukses ✅',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+        ),
         const SizedBox(height: 10),
+
         if (soldInvoice != null)
-          Text('Invoice: $soldInvoice', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w800)),
+          Text(
+            'Invoice: $soldInvoice',
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+
         if (soldTotal != null)
-          Text('Total: €${soldTotal!.toStringAsFixed(2)}',
-              style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 14),
-        const Text('Duke u mbyllur...', style: TextStyle(fontWeight: FontWeight.w800)),
-        const SizedBox(height: 6),
+          Text(
+            'Total: €${soldTotal!.toStringAsFixed(2)}',
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+
+        const SizedBox(height: 12),
+
+        // ✅ PREVIEW (nuk mbyllet dialogu)
+        FilledButton.tonalIcon(
+          onPressed: () {
+            final lines = buildReceiptLines(
+              invoiceNo: soldInvoice ?? 'INV-TEST',
+              date: DateTime.now(),
+              productName: p.name,
+              qty: 1,
+              size: selectedSize, // nëse e ki selectedSize
+              unitPriceFinal: p.finalPrice,
+              totalFinal: soldTotal ?? p.finalPrice,
+              unitPriceOriginal: p.price,
+              discountPercent: p.discountPercent,
+            );
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ReceiptPreview(
+                  title: 'SHOESTORE',
+                  lines: lines,
+                  widthMm: 80,
+                ),
+              ),
+            );
+          },
+          icon: const Icon(Icons.receipt_long),
+          label: const Text('Preview Fatura'),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ✅ PRINT (PDF 80mm) + pastaj e mbyll dialogun
+        FilledButton.icon(
+          onPressed: () async {
+            final lines = buildReceiptLines(
+              invoiceNo: soldInvoice ?? 'INV-TEST',
+              date: DateTime.now(),
+              productName: p.name,
+              qty: 1,
+              size: selectedSize,
+              unitPriceFinal: p.finalPrice,
+              totalFinal: soldTotal ?? p.finalPrice,
+              unitPriceOriginal: p.price,
+              discountPercent: p.discountPercent,
+            );
+
+            await ReceiptPdf80mm.printOrSave(
+              title: 'SHOESTORE',
+              lines: lines,
+              jobName: soldInvoice ?? 'receipt',
+            );
+
+            if (mounted) Navigator.pop(context); // ✅ mbyllet pasi ta printon
+          },
+          icon: const Icon(Icons.print),
+          label: const Text('PRINTO FATUREN'),
+        ),
+
+        const SizedBox(height: 10),
+
+        // ✅ buton mbyll
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Mbyll'),
+        ),
       ],
     );
   }
+
 }

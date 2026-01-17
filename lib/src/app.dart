@@ -16,11 +16,7 @@ class _AppRootState extends State<AppRoot> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      MainScreen(),
-      ProductsScreen(),
-      AdminScreen(),
-    ];
+    final pages = [MainScreen(), ProductsScreen(), AdminScreen()];
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -78,10 +74,7 @@ class _AppRootState extends State<AppRoot> {
 
             // CONTENT
             Expanded(
-              child: Container(
-                color: AppTheme.bg,
-                child: pages[index],
-              ),
+              child: Container(color: AppTheme.bg, child: pages[index]),
             ),
           ],
         ),

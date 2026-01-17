@@ -1,23 +1,17 @@
 // admin_screen.dart
 import 'dart:typed_data';
 
+import 'package:shoe_store_manager/auth/role_store.dart';
+
+import 'login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-
 import '../local/local_api.dart';
-
-/// ✅ Kjo file e ka:
-/// - Expenses + Invest dialogs (si i ke)
-/// - Statistika Sot/Muaj/Total (si i ke)
-/// - ✅ Print: Dita / Muaji / Viti / Total
-/// - ✅ Ruaj si PDF (Save As)
-///
-/// ⚠️ Shënim:
-/// - “VITI” kërkon query vjetor nga DB/API. Këtu është gati UI + PDF,
-///   por vlerat vjetore janë placeholder derisa ta shtojmë te LocalApi.
+import '../theme/app_theme.dart';
 
 String monthKey(DateTime d) =>
     '${d.year}-${(d.month).toString().padLeft(2, '0')}';
@@ -55,7 +49,8 @@ class _AdminScreenState extends State<AdminScreen> {
     'Rroga',
     'Rryma',
     'Uji',
-    'Berloku',
+    'Mbeturinat',
+    'Qeraja',
     'Shpenzime te pa planifikuara',
   ];
 
@@ -100,6 +95,18 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+
+  Future<void> doLogout(BuildContext context) async {
+    await RoleStore.clear();
+    if (!context.mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (_) => false,
+    );
+  }
+
+
   String _pdfFileName(_ReportScope scope) {
     final now = DateTime.now();
     String pad2(int n) => n.toString().padLeft(2, '0');
@@ -120,12 +127,14 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  // ✅ simple “success animation” (check icon pop)
+  // ✅ success popup
   Future<void> _showSuccessDialog(String msg) async {
     if (!mounted) return;
-    await showGeneralDialog(
+
+    // hap popup
+    showGeneralDialog(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false, // ✅ mos e lër me klikim (hiqet vet)
       barrierLabel: 'success',
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (_, __, ___) {
@@ -145,11 +154,14 @@ class _AdminScreenState extends State<AdminScreen> {
       },
     );
 
+    // ✅ mbylle vet pas 900ms
     await Future.delayed(const Duration(milliseconds: 900));
-    if (mounted && Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
+    if (!mounted) return;
+
+    // ✅ rootNavigator e mbyll dialogun sigurt
+    Navigator.of(context, rootNavigator: true).pop();
   }
+
 
   Future<void> _loadAll() async {
     setState(() => loading = true);
@@ -183,8 +195,10 @@ class _AdminScreenState extends State<AdminScreen> {
     final mk = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Zgjedh muajin',
-            style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text(
+          'Zgjedh muajin',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
         content: SizedBox(
           width: 420,
           child: ListView(
@@ -192,10 +206,13 @@ class _AdminScreenState extends State<AdminScreen> {
             children: [
               for (final m in monthOptions)
                 ListTile(
-                  title: Text(_formatMonthLabel(m),
-                      style: const TextStyle(fontWeight: FontWeight.w800)),
-                  trailing:
-                  m == selectedMonth ? const Icon(Icons.check_circle) : null,
+                  title: Text(
+                    _formatMonthLabel(m),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  trailing: m == selectedMonth
+                      ? const Icon(Icons.check_circle)
+                      : null,
                   onTap: () => Navigator.pop(context, m),
                 ),
             ],
@@ -203,8 +220,9 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Anulo')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Anulo'),
+          ),
         ],
       ),
     );
@@ -234,16 +252,84 @@ class _AdminScreenState extends State<AdminScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title:
-        const Text('Gabim', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text(
+          'Gabim',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
         content: Text(msg),
         actions: [
           FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
         ],
       ),
     );
+  }
+
+  // ✅ confirm revert
+  Future<bool> _confirmRevert(ActivityItem a) async {
+    final title = a.type == 'SALE'
+        ? 'Revert Shitjen?'
+        : a.type == 'INVEST'
+        ? 'Revert Investimin?'
+        : 'Revert Shpenzimin?';
+
+    final body = a.type == 'SALE'
+        ? 'Me bo revert kësaj shitje? Stoku kthehet mbrapsht.'
+        : 'Me bo revert këtij regjistrimi?';
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+        content: Text(body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Anulo'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.undo),
+            label: const Text('Revert'),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<void> _doRevert(ActivityItem a) async {
+    if (a.reverted) return;
+    if (a.refId == null) {
+      _showError('S’u gjet ID e regjistrimit.');
+      return;
+    }
+
+    final ok = await _confirmRevert(a);
+    if (!ok) return;
+
+    setState(() => loading = true);
+    try {
+      if (a.type == 'SALE') {
+        await LocalApi.I.revertSale(saleId: a.refId!);
+        await _loadAll();
+        await _showSuccessDialog('Shitja u revert-ua ✅ (stoku u kthye)');
+      } else if (a.type == 'INVEST') {
+        await LocalApi.I.revertInvestment(investId: a.refId!);
+        await _loadAll();
+        await _showSuccessDialog('Investimi u revert-ua ✅');
+      } else if (a.type == 'EXPENSE') {
+        await LocalApi.I.revertExpense(expenseId: a.refId!);
+        await _loadAll();
+        await _showSuccessDialog('Shpenzimi u revert-ua ✅');
+      }
+    } catch (e) {
+      _showError('Gabim: $e');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   // ---------- INVEST ALERT ----------
@@ -255,8 +341,10 @@ class _AdminScreenState extends State<AdminScreen> {
       context: context,
       barrierDismissible: true,
       builder: (ctx) => AlertDialog(
-        title: const Text('Blej Mall (Investim)',
-            style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text(
+          'Blej Mall (Investim)',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
         content: SizedBox(
           width: 520,
           child: Column(
@@ -264,8 +352,9 @@ class _AdminScreenState extends State<AdminScreen> {
             children: [
               TextField(
                 controller: amountC,
-                keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 decoration: const InputDecoration(
                   labelText: 'Amount (€)',
                   border: OutlineInputBorder(),
@@ -284,8 +373,9 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Anulo')),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Anulo'),
+          ),
           FilledButton.icon(
             onPressed: saving
                 ? null
@@ -302,7 +392,9 @@ class _AdminScreenState extends State<AdminScreen> {
               try {
                 await LocalApi.I.addInvestment(
                   amount: amount,
-                  note: noteC.text.trim().isEmpty ? null : noteC.text.trim(),
+                  note: noteC.text.trim().isEmpty
+                      ? null
+                      : noteC.text.trim(),
                 );
                 if (!mounted) return;
                 Navigator.pop(ctx);
@@ -332,8 +424,10 @@ class _AdminScreenState extends State<AdminScreen> {
       barrierDismissible: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('Shto Shpenzim',
-              style: TextStyle(fontWeight: FontWeight.w900)),
+          title: const Text(
+            'Shto Shpenzim',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
           content: SizedBox(
             width: 520,
             child: Column(
@@ -342,11 +436,15 @@ class _AdminScreenState extends State<AdminScreen> {
                 DropdownButtonFormField<String>(
                   value: expCategory,
                   items: expCategories
-                      .map((c) => DropdownMenuItem(
-                    value: c,
-                    child: Text(c,
-                        style: const TextStyle(fontWeight: FontWeight.w800)),
-                  ))
+                      .map(
+                        (c) => DropdownMenuItem(
+                      value: c,
+                      child: Text(
+                        c,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  )
                       .toList(),
                   onChanged: (v) {
                     if (v == null) return;
@@ -360,8 +458,9 @@ class _AdminScreenState extends State<AdminScreen> {
                 const SizedBox(height: 10),
                 TextField(
                   controller: expAmountC,
-                  keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Amount (€)',
                     border: OutlineInputBorder(),
@@ -385,8 +484,9 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Anulo')),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Anulo'),
+            ),
             FilledButton.icon(
               onPressed: expSaving
                   ? null
@@ -404,7 +504,9 @@ class _AdminScreenState extends State<AdminScreen> {
                   await LocalApi.I.addExpense(
                     category: expCategory,
                     amount: amount,
-                    note: expNoteC.text.trim().isEmpty ? null : expNoteC.text.trim(),
+                    note: expNoteC.text.trim().isEmpty
+                        ? null
+                        : expNoteC.text.trim(),
                   );
                   if (!mounted) return;
                   Navigator.pop(ctx);
@@ -429,8 +531,10 @@ class _AdminScreenState extends State<AdminScreen> {
   // ✅ PRINT / SAVE PDF
   // =======================
 
-  Future<void> _printOrSaveReport(_ReportScope scope,
-      {required bool saveAsPdf}) async {
+  Future<void> _printOrSaveReport(
+      _ReportScope scope, {
+        required bool saveAsPdf,
+      }) async {
     final s = stats;
     if (s == null) {
       _showError('S’ka statistika për me bo raport.');
@@ -445,31 +549,31 @@ class _AdminScreenState extends State<AdminScreen> {
 
     switch (scope) {
       case _ReportScope.day:
-        sales = (s.totalSalesToday ?? 0).toDouble();
-        profit = (s.totalProfitToday ?? 0).toDouble();
-        invest = (s.totalInvestToday ?? 0).toDouble();
-        exp = (s.totalExpensesToday ?? 0).toDouble();
-        countSales = (s.countSalesToday ?? 0);
+        sales = s.totalSalesToday.toDouble();
+        profit = s.totalProfitToday.toDouble();
+        invest = s.totalInvestToday.toDouble();
+        exp = s.totalExpensesToday.toDouble();
+        countSales = s.countSalesToday;
         break;
 
       case _ReportScope.month:
-        sales = (s.totalSalesMonth ?? 0).toDouble();
-        profit = (s.totalProfitMonth ?? 0).toDouble();
-        invest = (s.totalInvestMonth ?? 0).toDouble();
-        exp = (s.totalExpensesMonth ?? 0).toDouble();
-        countSales = (s.countSalesMonth ?? 0);
+        sales = s.totalSalesMonth.toDouble();
+        profit = s.totalProfitMonth.toDouble();
+        invest = s.totalInvestMonth.toDouble();
+        exp = s.totalExpensesMonth.toDouble();
+        countSales = s.countSalesMonth;
         break;
 
       case _ReportScope.total:
-        sales = (s.totalSalesAll ?? 0).toDouble();
-        profit = (s.totalProfitAll ?? 0).toDouble();
-        invest = (s.totalInvestAll ?? 0).toDouble();
-        exp = (s.totalExpensesAll ?? 0).toDouble();
-        countSales = (s.countSalesAll ?? 0);
+        sales = s.totalSalesAll.toDouble();
+        profit = s.totalProfitAll.toDouble();
+        invest = s.totalInvestAll.toDouble();
+        exp = s.totalExpensesAll.toDouble();
+        countSales = s.countSalesAll;
         break;
 
       case _ReportScope.year:
-      // ⚠️ PLACEHOLDER: duhet query vjetor nga DB/API
+      // placeholder
         sales = 0;
         profit = 0;
         invest = 0;
@@ -576,13 +680,19 @@ class _AdminScreenState extends State<AdminScreen> {
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text(_scopeTitle(scope),
-                      style: pw.TextStyle(font: fontBold, fontSize: 18)),
+                  pw.Text(
+                    _scopeTitle(scope),
+                    style: pw.TextStyle(font: fontBold, fontSize: 18),
+                  ),
                   pw.SizedBox(height: 4),
-                  pw.Text(periodLabel,
-                      style: pw.TextStyle(font: font, fontSize: 11)),
-                  pw.Text('Gjeneruar: $dateLabel',
-                      style: pw.TextStyle(font: font, fontSize: 10)),
+                  pw.Text(
+                    periodLabel,
+                    style: pw.TextStyle(font: font, fontSize: 11),
+                  ),
+                  pw.Text(
+                    'Gjeneruar: $dateLabel',
+                    style: pw.TextStyle(font: font, fontSize: 10),
+                  ),
                 ],
               ),
               pw.Container(
@@ -591,8 +701,10 @@ class _AdminScreenState extends State<AdminScreen> {
                   border: pw.Border.all(width: 0.8),
                   borderRadius: pw.BorderRadius.circular(8),
                 ),
-                child: pw.Text('Shoe Store Manager',
-                    style: pw.TextStyle(font: fontBold, fontSize: 11)),
+                child: pw.Text(
+                  'Shoe Store Manager',
+                  style: pw.TextStyle(font: fontBold, fontSize: 11),
+                ),
               ),
             ],
           ),
@@ -606,8 +718,10 @@ class _AdminScreenState extends State<AdminScreen> {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text('Përmbledhje',
-                    style: pw.TextStyle(font: fontBold, fontSize: 13)),
+                pw.Text(
+                  'Përmbledhje',
+                  style: pw.TextStyle(font: fontBold, fontSize: 13),
+                ),
                 pw.SizedBox(height: 10),
                 _pdfLine(font, fontBold, 'Shitje', _money(sales)),
                 _pdfLine(font, fontBold, 'Fitim', _money(profit)),
@@ -615,27 +729,20 @@ class _AdminScreenState extends State<AdminScreen> {
                 _pdfLine(font, fontBold, 'Shpenzime', _money(expenses)),
                 _pdfLine(font, fontBold, 'Nr. shitjesh', '$countSales'),
                 pw.Divider(),
-                _pdfLine(font, fontBold, 'Neto (Fitim - Shpenzime)', _money(net)),
+                _pdfLine(
+                  font,
+                  fontBold,
+                  'Neto (Fitim - Shpenzime)',
+                  _money(net),
+                ),
               ],
             ),
           ),
           pw.SizedBox(height: 14),
-          if (scope == _ReportScope.year)
-            pw.Container(
-              padding: const pw.EdgeInsets.all(10),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(width: 0.8),
-                borderRadius: pw.BorderRadius.circular(10),
-              ),
-              child: pw.Text(
-                '⚠️ Raporti vjetor ende s’është lidhur me query vjetore në DB/API. '
-                    'Tabela poshtë shfaq “Regjistrimet e fundit” (si në ekran).',
-                style: pw.TextStyle(font: font, fontSize: 10),
-              ),
-            ),
-          pw.SizedBox(height: 14),
-          pw.Text('Regjistrimet e fundit (si në Admin)',
-              style: pw.TextStyle(font: fontBold, fontSize: 13)),
+          pw.Text(
+            'Regjistrimet e fundit (si në Admin)',
+            style: pw.TextStyle(font: fontBold, fontSize: 13),
+          ),
           pw.SizedBox(height: 8),
           pw.Table(
             border: pw.TableBorder.all(width: 0.6),
@@ -656,9 +763,10 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
               ...activity.take(60).map((a) {
                 final sign = (a.type == 'SALE') ? '+' : '-';
+                final rev = a.reverted ? ' (REVERT)' : '';
                 return pw.TableRow(
                   children: [
-                    _pdfCell(font, a.type),
+                    _pdfCell(font, '${a.type}$rev'),
                     _pdfCell(font, a.title),
                     _pdfCell(font, a.sub),
                     _pdfCell(font, '$sign${_money(a.amount)}'),
@@ -701,6 +809,112 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
+  // ✅ Activity tile me SLIDE (Revert)
+  Widget _activityTile(ActivityItem a) {
+    final isSale = a.type == 'SALE';
+    final isInvest = a.type == 'INVEST';
+    final isExpense = a.type == 'EXPENSE';
+
+    final c = isSale
+        ? Colors.green
+        : (isExpense ? Colors.deepOrange : Colors.red);
+
+    final isReverted = a.reverted;
+    final bg = isReverted ? Colors.grey.withOpacity(0.12) : null;
+    final fg = isReverted ? Colors.grey : c;
+
+    final sign = isSale ? '+' : '-';
+
+    final icon = isSale
+        ? Icons.check_circle
+        : (isExpense ? Icons.receipt_long : Icons.shopping_cart);
+
+    final subtitle = isReverted ? '${a.sub}\n(REVERTED)' : a.sub;
+
+    final canRevert = !isReverted && a.refId != null;
+
+    Widget tile() => ListTile(
+      leading: CircleAvatar(
+        backgroundColor: fg.withOpacity(0.15),
+        child: Icon(icon, color: fg),
+      ),
+      title: Text(
+        a.title,
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+          color: isReverted ? Colors.grey.shade800 : null,
+          decoration: isReverted ? TextDecoration.lineThrough : null,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          color: isReverted ? Colors.grey.shade700 : null,
+        ),
+      ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            '$sign${_money(a.amount)}',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: fg,
+              decoration: isReverted ? TextDecoration.lineThrough : null,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            DateTime.fromMillisecondsSinceEpoch(a.createdAtMs)
+                .toLocal()
+                .toString(),
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // ✅ pa slide kur s’ka revert (ose already reverted / pa ID)
+    if (!canRevert) {
+      return Card(
+        color: bg,
+        child: tile(),
+      );
+    }
+
+    // ✅ me slide
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Slidable(
+        key: ValueKey('${a.type}-${a.refId}-${a.createdAtMs}'),
+        endActionPane: ActionPane(
+          motion: const DrawerMotion(),
+          extentRatio: 0.28,
+          children: [
+            SlidableAction(
+              onPressed: (_) => _doRevert(a),
+              backgroundColor: Colors.deepOrange,
+              foregroundColor: Colors.white,
+              icon: Icons.undo,
+              label: 'Revert',
+            ),
+          ],
+        ),
+        child: Card(
+          margin: EdgeInsets.zero,
+          color: bg, // ✅ gri kur reverted
+          child: tile(),
+        ),
+      ),
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final s = stats;
@@ -730,7 +944,6 @@ class _AdminScreenState extends State<AdminScreen> {
       appBar: AppBar(
         title: const Text('Admin Panel'),
         actions: [
-          // ✅ PRINT MENU
           PopupMenuButton<_ReportScope>(
             tooltip: 'Print / PDF',
             icon: const Icon(Icons.print),
@@ -738,13 +951,24 @@ class _AdminScreenState extends State<AdminScreen> {
               await _printOrSaveReport(scope, saveAsPdf: false);
             },
             itemBuilder: (_) => const [
-              PopupMenuItem(value: _ReportScope.day, child: Text('Print Dita (Sot)')),
-              PopupMenuItem(value: _ReportScope.month, child: Text('Print Muaji (i zgjedhur)')),
-              PopupMenuItem(value: _ReportScope.year, child: Text('Print Viti (i zgjedhur)')),
-              PopupMenuItem(value: _ReportScope.total, child: Text('Print Total (Gjithsej)')),
+              PopupMenuItem(
+                value: _ReportScope.day,
+                child: Text('Print Dita (Sot)'),
+              ),
+              PopupMenuItem(
+                value: _ReportScope.month,
+                child: Text('Print Muaji (i zgjedhur)'),
+              ),
+              PopupMenuItem(
+                value: _ReportScope.year,
+                child: Text('Print Viti (i zgjedhur)'),
+              ),
+              PopupMenuItem(
+                value: _ReportScope.total,
+                child: Text('Print Total (Gjithsej)'),
+              ),
             ],
           ),
-
           IconButton(
             tooltip: 'Ruaj si PDF (Muaji)',
             icon: const Icon(Icons.picture_as_pdf),
@@ -752,7 +976,6 @@ class _AdminScreenState extends State<AdminScreen> {
               await _printOrSaveReport(_ReportScope.month, saveAsPdf: true);
             },
           ),
-
           IconButton(
             tooltip: 'Expenses',
             onPressed: _openExpenseDialog,
@@ -774,12 +997,13 @@ class _AdminScreenState extends State<AdminScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Month chooser
             Card(
               child: ListTile(
                 leading: const Icon(Icons.calendar_month),
-                title: Text(_formatMonthLabel(selectedMonth),
-                    style: const TextStyle(fontWeight: FontWeight.w900)),
+                title: Text(
+                  _formatMonthLabel(selectedMonth),
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
                 subtitle: const Text('Filter për statistika mujore'),
                 trailing: const Icon(Icons.expand_more),
                 onTap: _changeMonth,
@@ -787,7 +1011,6 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
             const SizedBox(height: 10),
 
-            // Stats (SOT / MUAJ / TOTAL)
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -796,7 +1019,10 @@ class _AdminScreenState extends State<AdminScreen> {
                   children: [
                     const Text(
                       'Statistikat (Sot / Muaj / Total)',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     _tripleHeader(
@@ -813,7 +1039,8 @@ class _AdminScreenState extends State<AdminScreen> {
                       right: _money(salesAll),
                       leftColor: Colors.green,
                       midColor: Colors.blue,
-                      rightColor: Theme.of(context).colorScheme.onSurface,
+                      rightColor:
+                      Theme.of(context).colorScheme.onSurface,
                     ),
                     const SizedBox(height: 8),
 
@@ -824,7 +1051,8 @@ class _AdminScreenState extends State<AdminScreen> {
                       right: _money(profitAll),
                       leftColor: Colors.green,
                       midColor: Colors.blue,
-                      rightColor: Theme.of(context).colorScheme.onSurface,
+                      rightColor:
+                      Theme.of(context).colorScheme.onSurface,
                     ),
                     const SizedBox(height: 8),
 
@@ -833,9 +1061,12 @@ class _AdminScreenState extends State<AdminScreen> {
                       left: '$countToday',
                       mid: '$countMonth',
                       right: '$countAll',
-                      leftColor: Theme.of(context).colorScheme.onSurface,
-                      midColor: Theme.of(context).colorScheme.onSurface,
-                      rightColor: Theme.of(context).colorScheme.onSurface,
+                      leftColor:
+                      Theme.of(context).colorScheme.onSurface,
+                      midColor:
+                      Theme.of(context).colorScheme.onSurface,
+                      rightColor:
+                      Theme.of(context).colorScheme.onSurface,
                     ),
                     const SizedBox(height: 8),
 
@@ -868,11 +1099,16 @@ class _AdminScreenState extends State<AdminScreen> {
                       spacing: 10,
                       runSpacing: 10,
                       children: [
-                        _statCard('Stok Total (Copë)', '${s?.totalStock ?? 0}',
-                            Icons.inventory_2),
+                        _statCard(
+                          'Stok Total (Copë)',
+                          '${s?.totalStock ?? 0}',
+                          Icons.inventory_2,
+                        ),
                         _statCard(
                           'Vlera e Stokut (Final)',
-                          _money((s?.totalStockValueFinal ?? 0).toDouble()),
+                          _money(
+                            (s?.totalStockValueFinal ?? 0).toDouble(),
+                          ),
                           Icons.euro,
                           tint: Colors.green,
                         ),
@@ -885,11 +1121,14 @@ class _AdminScreenState extends State<AdminScreen> {
 
             const SizedBox(height: 14),
 
-            // Quick actions
             Row(
               children: [
                 Expanded(
                   child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.success,
+                      foregroundColor: Colors.white,
+                    ),
                     onPressed: _openInvestDialog,
                     icon: const Icon(Icons.add_circle),
                     label: const Text('Shto Investim'),
@@ -908,14 +1147,20 @@ class _AdminScreenState extends State<AdminScreen> {
 
             const SizedBox(height: 14),
 
-            // Activity
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
-                Text('Regjistrimet e fundit',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                Text('(shitje=gj.) (invest=kuqe) (exp=portokalli)',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
+                Text(
+                  'Regjistrimet e fundit',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  '(slide -> revert)',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -928,53 +1173,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 ),
               )
             else
-              ...activity.map((a) {
-                final isSale = a.type == 'SALE';
-                final isInvest = a.type == 'INVEST';
-                final isExpense = a.type == 'EXPENSE';
-
-                final c = isSale
-                    ? Colors.green
-                    : (isExpense ? Colors.deepOrange : Colors.red);
-                final sign = isSale ? '+' : '-';
-
-                final icon = isSale
-                    ? Icons.check_circle
-                    : (isExpense ? Icons.receipt_long : Icons.shopping_cart);
-
-                return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: c.withOpacity(0.15),
-                      child: Icon(icon, color: c),
-                    ),
-                    title: Text(a.title,
-                        style: const TextStyle(fontWeight: FontWeight.w900)),
-                    subtitle: Text(a.sub),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '$sign${_money(a.amount)}',
-                          style: TextStyle(fontWeight: FontWeight.w900, color: c),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          DateTime.fromMillisecondsSinceEpoch(a.createdAtMs)
-                              .toLocal()
-                              .toString(),
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
+              ...activity.map(_activityTile),
           ],
         ),
       ),
@@ -1042,13 +1241,19 @@ class _AdminScreenState extends State<AdminScreen> {
                 .surfaceContainerHighest
                 .withOpacity(0.45),
             border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.7),
+              color: Theme.of(context)
+                  .colorScheme
+                  .outlineVariant
+                  .withOpacity(0.7),
             ),
           ),
           child: Text(
             v,
             textAlign: TextAlign.center,
-            style: t.titleSmall?.copyWith(fontWeight: FontWeight.w900, color: c),
+            style: t.titleSmall?.copyWith(
+              fontWeight: FontWeight.w900,
+              color: c,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -1089,14 +1294,22 @@ class _AdminScreenState extends State<AdminScreen> {
                   Icon(icon, color: c),
                   const SizedBox(width: 8),
                   Expanded(
-                      child: Text(title,
-                          style: const TextStyle(fontWeight: FontWeight.w800))),
+                    child: Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
-              Text(value,
-                  style: TextStyle(
-                      fontWeight: FontWeight.w900, fontSize: 18, color: c)),
+              Text(
+                value,
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                  color: c,
+                ),
+              ),
             ],
           ),
         ),
@@ -1121,14 +1334,13 @@ class _AdminScreenState extends State<AdminScreen> {
       'Shtator',
       'Tetor',
       'Nëntor',
-      'Dhjetor'
+      'Dhjetor',
     ];
     final idx = (m - 1).clamp(0, 11);
     return '${names[idx]} $y';
   }
 }
 
-// ✅ Success popup widget with tiny animation feel
 class _SuccessPopup extends StatelessWidget {
   final String message;
   const _SuccessPopup({required this.message});
@@ -1142,9 +1354,10 @@ class _SuccessPopup extends StatelessWidget {
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.6)),
+          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.6),
+        ),
         boxShadow: const [
-          BoxShadow(blurRadius: 18, spreadRadius: 2, color: Color(0x33000000))
+          BoxShadow(blurRadius: 18, spreadRadius: 2, color: Color(0x33000000)),
         ],
       ),
       child: Column(
@@ -1157,7 +1370,11 @@ class _SuccessPopup extends StatelessWidget {
               color: Colors.green.withOpacity(0.12),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Icon(Icons.check_circle, color: Colors.green, size: 42),
+            child: const Icon(
+              Icons.check_circle,
+              color: Colors.green,
+              size: 42,
+            ),
           ),
           const SizedBox(height: 12),
           Text(

@@ -1,73 +1,105 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const bg = Color(0xFF1C2F4A);
+  // =====================
+  // BACKGROUNDS
+  // =====================
+  static const bg = Color(0xFF121212);        // almost black
+  static const surface = Color(0xFF1E1E1E);   // dark gray
+  static const surface2 = Color(0xFF2A2A2A);  // medium gray
 
-  static const surface = Color(0xFF223A5E);
+  // =====================
+  // BORDERS & TEXT
+  // =====================
+  static const stroke = Color.fromRGBO(255, 255, 255, 0.08);
+  static const text = Color(0xFFFFFFFF); // white
+  static const muted = Color.fromRGBO(255, 255, 255, 0.65);
+  static const subtle = Color.fromRGBO(255, 255, 255, 0.45);
 
-  static const surface2 = Color(0xFF0F3460);
-  static const stroke = Color.fromRGBO(255, 255, 255, 0.1);
-  static const text = Color(0xFFE9ECEF);
-  static const muted = Color.fromRGBO(233, 236, 239, 0.7);
-  static const subtle = Color.fromRGBO(233, 236, 239, 0.5);
-
+  // =====================
+  // STATUS COLORS
+  // =====================
   static const success = Color(0xFF4CAF50);
-  static const delete = Color(0xFFF44336);
-  static const warning = Color(0xFFFF9800);
-  static const info = Color(0xFF2196F3);
-  static const accent = Color(0xFFF72585);
-  static const primaryPurple = Color(0xFF7209B7);
-  static const darkPurple = Color(0xFF3A0CA3);
-  static const blueAccent = Color(0xFF4361EE);
-  static const cyanAccent = Color(0xFF4CC9F0);
+  static const delete = Color(0xFFE53935);
+  static const warning = Color(0xFFFFB300);
+  static const info = Color(0xFF90CAF9);
 
+  // =====================
+  // ACCENTS (neutralized)
+  // =====================
+  static const accent = Color(0xFFE0E0E0);        // light gray
+  static const primaryPurple = Color(0xFFFFFFFF); // white primary
+  static const darkPurple = Color(0xFFBDBDBD);    // gray
+  static const blueAccent = Color(0xFF9E9E9E);    // neutral gray
+  static const cyanAccent = Color(0xFF757575);   // darker gray
+
+  // =====================
+  // THEME
+  // =====================
   static ThemeData dark() {
     return ThemeData(
       brightness: Brightness.dark,
       scaffoldBackgroundColor: bg,
       useMaterial3: true,
+
       textTheme: const TextTheme(
-        bodyMedium: TextStyle(color: text, fontWeight: FontWeight.w700),
+        bodyMedium: TextStyle(
+          color: text,
+          fontWeight: FontWeight.w600,
+        ),
+        bodySmall: TextStyle(
+          color: muted,
+        ),
       ),
+
       colorScheme: const ColorScheme.dark(
-        primary: primaryPurple, // Custom purple as primary
-        secondary: blueAccent, // Custom blue as secondary
-        tertiary: cyanAccent, // Custom cyan as tertiary
+        primary: primaryPurple,
+        secondary: blueAccent,
+        tertiary: cyanAccent,
         surface: surface,
         onSurface: text,
         error: delete,
-        onPrimary: text,
-        onSecondary: text,
+        onPrimary: bg,
+        onSecondary: bg,
         onError: text,
       ),
+
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: accent, // Custom pink accent for primary actions
-          foregroundColor: Colors.black,
+          backgroundColor: accent,
+          foregroundColor: bg,
+          elevation: 0,
         ),
       ),
+
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: accent, // Custom pink accent for filled buttons
-          foregroundColor: Colors.black,
+          backgroundColor: surface2,
+          foregroundColor: text,
+          elevation: 0,
         ),
       ),
+
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: text,
           side: const BorderSide(color: stroke),
         ),
       ),
+
       cardTheme: CardThemeData(
         color: surface,
-        elevation: 4,
-        shadowColor: Colors.black.withOpacity(0.3),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.25),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
       ),
+
       appBarTheme: AppBarTheme(
         backgroundColor: surface,
         foregroundColor: text,
-        elevation: 2,
+        elevation: 1,
         shadowColor: Colors.black.withOpacity(0.3),
       ),
     );

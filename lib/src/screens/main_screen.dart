@@ -617,7 +617,7 @@ class _ProductDialogState extends State<_ProductDialog> {
                         )
                             : const Icon(Icons.point_of_sale),
                         label: Text(
-                          selling ? 'Duke shitur...' : 'BLEJ / SHIT 1',
+                          selling ? 'Duke shitur...' : 'Paguaj',
                         ),
                       ),
                     ),

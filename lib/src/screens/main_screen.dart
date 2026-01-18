@@ -11,6 +11,36 @@ import 'package:shoe_store_manager/src/screens/login_screen.dart';
 import '../local/local_api.dart';
 import '../theme/app_theme.dart';
 
+/// ✅ SIZE LABEL FORMATTER (same logic as ProductScreen)
+String formatSizeLabel(int size) {
+  switch (size) {
+    case 1000:
+      return '0–3m';
+    case 1001:
+      return '3–6m';
+    case 1002:
+      return '6–9m';
+    case 1003:
+      return '9–12m';
+    case 1004:
+      return '12–18m';
+    case 1005:
+      return '18–24m';
+    case 1006:
+      return '2y';
+    case 1007:
+      return '3y';
+    case 1008:
+      return '4y';
+    case 1009:
+      return '5y';
+    case 1010:
+      return '6y';
+    default:
+      return size.toString(); // normal shoe sizes (36,37..)
+  }
+}
+
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -407,6 +437,7 @@ class _ProductDialogState extends State<_ProductDialog> {
   @override
   void initState() {
     super.initState();
+
     // auto select first available size
     final sizes = widget.product.sizesSorted;
     for (final s in sizes) {
@@ -452,9 +483,8 @@ class _ProductDialogState extends State<_ProductDialog> {
                       ),
                     ),
                     IconButton(
-                      onPressed: selling
-                          ? null
-                          : () => Navigator.pop(context),
+                      onPressed:
+                      selling ? null : () => Navigator.pop(context),
                       icon: const Icon(Icons.close),
                     ),
                   ],
@@ -523,8 +553,7 @@ class _ProductDialogState extends State<_ProductDialog> {
                                 '€${p.price.toStringAsFixed(2)}',
                                 style: TextStyle(
                                   color: Colors.grey.shade700,
-                                  decoration:
-                                  TextDecoration.lineThrough,
+                                  decoration: TextDecoration.lineThrough,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -545,8 +574,8 @@ class _ProductDialogState extends State<_ProductDialog> {
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.orange
-                                          .withOpacity(0.14),
+                                      color:
+                                      Colors.orange.withOpacity(0.14),
                                       borderRadius:
                                       BorderRadius.circular(999),
                                       border: Border.all(
@@ -567,7 +596,7 @@ class _ProductDialogState extends State<_ProductDialog> {
                             Text(
                               selectedSize == null
                                   ? 'Zgjedh numrin për me shit.'
-                                  : 'Numri i zgjedhun: $selectedSize',
+                                  : 'Numri i zgjedhun: ${formatSizeLabel(selectedSize!)}',
                               style: TextStyle(
                                 color: Colors.grey.shade700,
                                 fontWeight: FontWeight.w800,
@@ -586,9 +615,8 @@ class _ProductDialogState extends State<_ProductDialog> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: selling
-                            ? null
-                            : () => Navigator.pop(context),
+                        onPressed:
+                        selling ? null : () => Navigator.pop(context),
                         icon: const Icon(Icons.keyboard_return),
                         label: const Text('Mbyll'),
                       ),
@@ -630,7 +658,7 @@ class _ProductDialogState extends State<_ProductDialog> {
                       : (selectedSize == null)
                       ? 'Zgjedh numrin (size).'
                       : (p.qtyForSize(selectedSize!) <= 0)
-                      ? 'S’ka stok për numrin $selectedSize.'
+                      ? 'S’ka stok për numrin ${formatSizeLabel(selectedSize!)}.'
                       : 'Kliko “BLEJ” për me e regjistru shitjen.',
                   style: TextStyle(
                     color: Colors.grey.shade700,
@@ -664,7 +692,8 @@ class _ProductDialogState extends State<_ProductDialog> {
           ),
         ),
         child: Text(
-          '$size ($qty)',
+          // ✅ HERE is the fix:
+          '${formatSizeLabel(size)} ($qty)',
           style: TextStyle(
             color: c,
             fontWeight: FontWeight.w900,
@@ -717,7 +746,6 @@ class _ProductDialogState extends State<_ProductDialog> {
       });
 
       // ✅ MOS e mbyll automatikisht.
-      // Dialogu mbyllet vetëm kur klikon PRINT (ose mundesh me shtu “Mbyll” buton).
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -769,6 +797,18 @@ class _ProductDialogState extends State<_ProductDialog> {
             ),
           ),
 
+        if (selectedSize != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Numri: ${formatSizeLabel(selectedSize!)}',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+
         const SizedBox(height: 12),
 
         // ✅ PREVIEW (nuk mbyllet dialogu)
@@ -779,7 +819,7 @@ class _ProductDialogState extends State<_ProductDialog> {
               date: DateTime.now(),
               productName: p.name,
               qty: 1,
-              size: selectedSize, // nëse e ki selectedSize
+              size: selectedSize,
               unitPriceFinal: p.finalPrice,
               totalFinal: soldTotal ?? p.finalPrice,
               unitPriceOriginal: p.price,
@@ -824,7 +864,7 @@ class _ProductDialogState extends State<_ProductDialog> {
               jobName: soldInvoice ?? 'receipt',
             );
 
-            if (mounted) Navigator.pop(context); // ✅ mbyllet pasi ta printon
+            if (mounted) Navigator.pop(context);
           },
           icon: const Icon(Icons.print),
           label: const Text('PRINTO FATUREN'),
@@ -832,7 +872,6 @@ class _ProductDialogState extends State<_ProductDialog> {
 
         const SizedBox(height: 10),
 
-        // ✅ buton mbyll
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Mbyll'),
@@ -840,5 +879,4 @@ class _ProductDialogState extends State<_ProductDialog> {
       ],
     );
   }
-
 }

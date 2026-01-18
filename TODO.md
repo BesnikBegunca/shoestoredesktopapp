@@ -1,17 +1,8 @@
-- [x] Remove comments from lib/main.dart
-- [x] Remove comments from lib/auth/role_store.dart
-- [ ] Remove comments from lib/printing/receipt_builder.dart
-- [x] Remove comments from lib/printing/receipt_pdf_80mm.dart
-- [x] Remove comments from lib/printing/receipt_preview.dart
-- [ ] Remove comments from lib/src/app.dart
-- [x] Remove comments from lib/src/db/app_db.dart
-- [ ] Remove comments from lib/src/db/schema.dart
-- [ ] Remove comments from lib/src/local/local_api.dart
-- [ ] Remove comments from lib/src/screens/admin_screen.dart
-- [ ] Remove comments from lib/src/screens/app_shell.dart
-- [ ] Remove comments from lib/src/screens/boot_gate.dart
-- [ ] Remove comments from lib/src/screens/login_screen.dart
-- [ ] Remove comments from lib/src/screens/main_screen.dart
-- [x] Remove comments from lib/src/screens/products_screen.dart
-- [ ] Remove comments from lib/src/screens/settings_screen.dart
-- [x] Remove comments from lib/src/theme/app_theme.dart
+# TODO: Add Cart Functionality to Main Screen
+
+- [ ] Add CartItem class (product, size, quantity) in main_screen.dart
+- [ ] Add List<CartItem> cart to _MainScreenState
+- [ ] Modify _ProductDialog: Change "Paguaj" to "Blej Tani", add "Shto në Shportë" button
+- [ ] Add cart icon with badge in app bar
+- [ ] Create _CartDialog: List items, show total, allow removal, add checkout
+- [ ] Implement checkout: Loop sellOne, show success, clear cart, refresh

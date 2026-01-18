@@ -480,6 +480,9 @@ class _MainScreenState extends State<MainScreen> {
 
       final res = await LocalApi.I.sellMany(cartItems: cart, userId: uid);
 
+      // Store cart items for receipt before clearing
+      final cartItemsForReceipt = List<CartItem>.from(cart);
+
       // Clear cart
       setState(() => cart.clear());
 
@@ -494,12 +497,12 @@ class _MainScreenState extends State<MainScreen> {
         builder: (_) => _CheckoutSuccessDialog(
           invoiceNo: res.invoiceNo,
           total: res.total,
-          cartItems: cart,
+          cartItems: cartItemsForReceipt,
           onPrint: () async {
             final lines = buildReceiptLinesForCart(
               invoiceNo: res.invoiceNo,
               date: DateTime.now(),
-              cartItems: cart,
+              cartItems: cartItemsForReceipt,
             );
 
             await ReceiptPdf80mm.printOrSave(

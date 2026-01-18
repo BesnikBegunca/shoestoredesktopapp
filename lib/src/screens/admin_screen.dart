@@ -1,19 +1,23 @@
 // admin_screen.dart
 import 'dart:typed_data';
 
-import 'package:shoe_store_manager/auth/role_store.dart';
-
-import 'login_screen.dart';
-import 'package:flutter/material.dart';
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:shoe_store_manager/auth/role_store.dart';
+import 'package:shoe_store_manager/models/app_user.dart';
+
 import '../local/local_api.dart';
 import '../theme/app_theme.dart';
+import 'login_screen.dart';
 
 String monthKey(DateTime d) => '${d.year}-${(d.month).toString().padLeft(2, '0')}';
+
+enum _ReportScope { day, month, year, total }
+enum _AdminTab { dashboard, users }
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -22,16 +26,21 @@ class AdminScreen extends StatefulWidget {
   State<AdminScreen> createState() => _AdminScreenState();
 }
 
-enum _ReportScope { day, month, year, total }
-
 class _AdminScreenState extends State<AdminScreen> {
   bool loading = true;
 
+  // tabs
+  _AdminTab tab = _AdminTab.dashboard;
+
+  // DASHBOARD DATA
   List<String> monthOptions = [];
   String selectedMonth = monthKey(DateTime.now());
-
   AdminStats? stats;
   List<ActivityItem> activity = [];
+
+  // USERS DATA
+  bool usersLoading = false;
+  List<AppUser> users = [];
 
   // INVEST
   final amountC = TextEditingController();
@@ -94,22 +103,11 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  Future<void> doLogout(BuildContext context) async {
-    await RoleStore.clear();
-    if (!context.mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (_) => false,
-    );
-  }
-
   String _pdfFileName(_ReportScope scope) {
     final now = DateTime.now();
     String pad2(int n) => n.toString().padLeft(2, '0');
-
     final day = '${now.year}-${pad2(now.month)}-${pad2(now.day)}';
-    final mk = selectedMonth; // "YYYY-MM"
+    final mk = selectedMonth;
     final y = _selectedYear();
 
     switch (scope) {
@@ -124,7 +122,76 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  // ✅ success popup
+  String _formatMonthLabel(String mk) {
+    final parts = mk.split('-');
+    if (parts.length != 2) return mk;
+    final y = parts[0];
+    final m = int.tryParse(parts[1]) ?? 1;
+    const names = [
+      'Janar',
+      'Shkurt',
+      'Mars',
+      'Prill',
+      'Maj',
+      'Qershor',
+      'Korrik',
+      'Gusht',
+      'Shtator',
+      'Tetor',
+      'Nëntor',
+      'Dhjetor',
+    ];
+    final idx = (m - 1).clamp(0, 11);
+    return '${names[idx]} $y';
+  }
+
+  // ✅ NEW: group container for stats (Sot / Muaji / Total)
+  Widget _statsGroup(String title, List<Widget> cards) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surface2.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.stroke),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppTheme.text,
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...cards.map(
+                (c) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: c,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------- dialogs ----------
+  void _showError(String msg) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Gabim', style: TextStyle(fontWeight: FontWeight.w900)),
+        content: Text(msg),
+        actions: [
+          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showSuccessDialog(String msg) async {
     if (!mounted) return;
 
@@ -152,10 +219,20 @@ class _AdminScreenState extends State<AdminScreen> {
 
     await Future.delayed(const Duration(milliseconds: 900));
     if (!mounted) return;
-
     Navigator.of(context, rootNavigator: true).pop();
   }
 
+  Future<void> doLogout(BuildContext context) async {
+    await RoleStore.clear();
+    if (!context.mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (_) => false,
+    );
+  }
+
+  // ---------- load ----------
   Future<void> _loadAll() async {
     setState(() => loading = true);
     try {
@@ -182,16 +259,26 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  Future<void> _loadUsers() async {
+    setState(() => usersLoading = true);
+    try {
+      final list = await LocalApi.I.getAllUsers();
+      if (!mounted) return;
+      setState(() => users = list);
+    } catch (e) {
+      _showError('Gabim: $e');
+    } finally {
+      if (mounted) setState(() => usersLoading = false);
+    }
+  }
+
   Future<void> _changeMonth() async {
     if (monthOptions.isEmpty) return;
 
     final mk = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text(
-          'Zgjedh muajin',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
+        title: const Text('Zgjedh muajin', style: TextStyle(fontWeight: FontWeight.w900)),
         content: SizedBox(
           width: 420,
           child: ListView(
@@ -199,10 +286,7 @@ class _AdminScreenState extends State<AdminScreen> {
             children: [
               for (final m in monthOptions)
                 ListTile(
-                  title: Text(
-                    _formatMonthLabel(m),
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
+                  title: Text(_formatMonthLabel(m), style: const TextStyle(fontWeight: FontWeight.w800)),
                   trailing: m == selectedMonth ? const Icon(Icons.check_circle) : null,
                   onTap: () => Navigator.pop(context, m),
                 ),
@@ -210,10 +294,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Anulo'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Anulo')),
         ],
       ),
     );
@@ -238,27 +319,7 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  void _showError(String msg) {
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text(
-          'Gabim',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
-        content: Text(msg),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ✅ confirm revert
+  // ---------- revert ----------
   Future<bool> _confirmRevert(ActivityItem a) async {
     final title = a.type == 'SALE'
         ? 'Revert Shitjen?'
@@ -276,10 +337,7 @@ class _AdminScreenState extends State<AdminScreen> {
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
         content: Text(body),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Anulo'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Anulo')),
           FilledButton.icon(
             onPressed: () => Navigator.pop(context, true),
             icon: const Icon(Icons.undo),
@@ -323,7 +381,7 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  // ---------- INVEST ALERT ----------
+  // ---------- invest ----------
   Future<void> _openInvestDialog() async {
     amountC.clear();
     noteC.clear();
@@ -332,10 +390,7 @@ class _AdminScreenState extends State<AdminScreen> {
       context: context,
       barrierDismissible: true,
       builder: (ctx) => AlertDialog(
-        title: const Text(
-          'Blej Mall (Investim)',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
+        title: const Text('Blej Mall (Investim)', style: TextStyle(fontWeight: FontWeight.w900)),
         content: SizedBox(
           width: 520,
           child: Column(
@@ -361,10 +416,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Anulo'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Anulo')),
           FilledButton.icon(
             onPressed: saving
                 ? null
@@ -401,7 +453,7 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  // ---------- EXPENSE ALERT ----------
+  // ---------- expense ----------
   Future<void> _openExpenseDialog() async {
     expAmountC.clear();
     expNoteC.clear();
@@ -411,10 +463,7 @@ class _AdminScreenState extends State<AdminScreen> {
       barrierDismissible: true,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: const Text(
-            'Shto Shpenzim',
-            style: TextStyle(fontWeight: FontWeight.w900),
-          ),
+          title: const Text('Shto Shpenzim', style: TextStyle(fontWeight: FontWeight.w900)),
           content: SizedBox(
             width: 520,
             child: Column(
@@ -452,9 +501,8 @@ class _AdminScreenState extends State<AdminScreen> {
                 TextField(
                   controller: expNoteC,
                   decoration: InputDecoration(
-                    labelText: expCategory == 'Rroga'
-                        ? 'Emri i punëtorit / shënim'
-                        : 'Shënim (opsional)',
+                    labelText:
+                    expCategory == 'Rroga' ? 'Emri i punëtorit / shënim' : 'Shënim (opsional)',
                     hintText: expCategory == 'Rroga' ? 'p.sh. Arben - Rroga Janar' : null,
                     border: const OutlineInputBorder(),
                   ),
@@ -463,10 +511,7 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Anulo'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Anulo')),
             FilledButton.icon(
               onPressed: expSaving
                   ? null
@@ -481,11 +526,14 @@ class _AdminScreenState extends State<AdminScreen> {
 
                 setState(() => expSaving = true);
                 try {
+                  // nëse s’po e përdor userId te expenses -> lëre 0
                   await LocalApi.I.addExpense(
+                    userId: 0,
                     category: expCategory,
                     amount: amount,
                     note: expNoteC.text.trim().isEmpty ? null : expNoteC.text.trim(),
                   );
+
                   if (!mounted) return;
                   Navigator.pop(ctx);
                   await _loadAll();
@@ -506,7 +554,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   // =======================
-  // ✅ PRINT / SAVE PDF
+  // PRINT / SAVE PDF
   // =======================
 
   Future<void> _printOrSaveReport(
@@ -525,38 +573,42 @@ class _AdminScreenState extends State<AdminScreen> {
     double sales = 0, profit = 0, invest = 0, exp = 0;
     int countSales = 0;
 
-    switch (scope) {
-      case _ReportScope.day:
-        sales = s.totalSalesToday.toDouble();
-        profit = s.totalProfitToday.toDouble();
-        invest = s.totalInvestToday.toDouble();
-        exp = s.totalExpensesToday.toDouble();
-        countSales = s.countSalesToday;
-        break;
+    if (scope == _ReportScope.year) {
+      final ys = await LocalApi.I.getYearStats(year);
+      sales = ys.totalSales;
+      profit = ys.totalProfit;
+      invest = ys.totalInvest;
+      exp = ys.totalExpenses;
+      countSales = ys.countSales;
+    } else {
+      switch (scope) {
+        case _ReportScope.day:
+          sales = s.totalSalesToday.toDouble();
+          profit = s.totalProfitToday.toDouble();
+          invest = s.totalInvestToday.toDouble();
+          exp = s.totalExpensesToday.toDouble();
+          countSales = s.countSalesToday;
+          break;
 
-      case _ReportScope.month:
-        sales = s.totalSalesMonth.toDouble();
-        profit = s.totalProfitMonth.toDouble();
-        invest = s.totalInvestMonth.toDouble();
-        exp = s.totalExpensesMonth.toDouble();
-        countSales = s.countSalesMonth;
-        break;
+        case _ReportScope.month:
+          sales = s.totalSalesMonth.toDouble();
+          profit = s.totalProfitMonth.toDouble();
+          invest = s.totalInvestMonth.toDouble();
+          exp = s.totalExpensesMonth.toDouble();
+          countSales = s.countSalesMonth;
+          break;
 
-      case _ReportScope.total:
-        sales = s.totalSalesAll.toDouble();
-        profit = s.totalProfitAll.toDouble();
-        invest = s.totalInvestAll.toDouble();
-        exp = s.totalExpensesAll.toDouble();
-        countSales = s.countSalesAll;
-        break;
+        case _ReportScope.total:
+          sales = s.totalSalesAll.toDouble();
+          profit = s.totalProfitAll.toDouble();
+          invest = s.totalInvestAll.toDouble();
+          exp = s.totalExpensesAll.toDouble();
+          countSales = s.countSalesAll;
+          break;
 
-      case _ReportScope.year:
-        sales = 0;
-        profit = 0;
-        invest = 0;
-        exp = 0;
-        countSales = 0;
-        break;
+        case _ReportScope.year:
+          break;
+      }
     }
 
     final net = profit - exp;
@@ -657,19 +709,10 @@ class _AdminScreenState extends State<AdminScreen> {
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text(
-                    _scopeTitle(scope),
-                    style: pw.TextStyle(font: fontBold, fontSize: 18),
-                  ),
+                  pw.Text(_scopeTitle(scope), style: pw.TextStyle(font: fontBold, fontSize: 18)),
                   pw.SizedBox(height: 4),
-                  pw.Text(
-                    periodLabel,
-                    style: pw.TextStyle(font: font, fontSize: 11),
-                  ),
-                  pw.Text(
-                    'Gjeneruar: $dateLabel',
-                    style: pw.TextStyle(font: font, fontSize: 10),
-                  ),
+                  pw.Text(periodLabel, style: pw.TextStyle(font: font, fontSize: 11)),
+                  pw.Text('Gjeneruar: $dateLabel', style: pw.TextStyle(font: font, fontSize: 10)),
                 ],
               ),
               pw.Container(
@@ -678,10 +721,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   border: pw.Border.all(width: 0.8),
                   borderRadius: pw.BorderRadius.circular(8),
                 ),
-                child: pw.Text(
-                  'Shoe Store Manager',
-                  style: pw.TextStyle(font: fontBold, fontSize: 11),
-                ),
+                child: pw.Text('Shoe Store Manager', style: pw.TextStyle(font: fontBold, fontSize: 11)),
               ),
             ],
           ),
@@ -695,22 +735,13 @@ class _AdminScreenState extends State<AdminScreen> {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(
-                  'Përmbledhje',
-                  style: pw.TextStyle(font: fontBold, fontSize: 13),
-                ),
+                pw.Text('Përmbledhje', style: pw.TextStyle(font: fontBold, fontSize: 13)),
                 pw.SizedBox(height: 10),
                 _pdfLine(font, fontBold, 'Shitje', _money(sales)),
                 _pdfLine(font, fontBold, 'Fitim', _money(profit)),
                 _pdfLine(font, fontBold, 'Investim', _money(invest)),
                 _pdfLine(font, fontBold, 'Shpenzime', _money(expenses)),
-                // ✅ SHTESA: Shpenzime + Investime
-                _pdfLine(
-                  font,
-                  fontBold,
-                  'Shpenzime + Investime',
-                  _money(expenses + invest),
-                ),
+                _pdfLine(font, fontBold, 'Shpenzime + Investime', _money(expenses + invest)),
                 _pdfLine(font, fontBold, 'Nr. shitjesh', '$countSales'),
                 pw.Divider(),
                 _pdfLine(font, fontBold, 'Neto (Fitim - Shpenzime)', _money(net)),
@@ -718,10 +749,7 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
           ),
           pw.SizedBox(height: 14),
-          pw.Text(
-            'Regjistrimet e fundit (si në Admin)',
-            style: pw.TextStyle(font: fontBold, fontSize: 13),
-          ),
+          pw.Text('Regjistrimet e fundit (si në Admin)', style: pw.TextStyle(font: fontBold, fontSize: 13)),
           pw.SizedBox(height: 8),
           pw.Table(
             border: pw.TableBorder.all(width: 0.6),
@@ -788,7 +816,7 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  // ✅ Activity tile me SLIDE (Revert)
+  // ---------- activity tile ----------
   Widget _activityTile(ActivityItem a) {
     final isSale = a.type == 'SALE';
     final isExpense = a.type == 'EXPENSE';
@@ -801,9 +829,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
     final sign = isSale ? '+' : '-';
 
-    final icon = isSale
-        ? Icons.check_circle
-        : (isExpense ? Icons.receipt_long : Icons.shopping_cart);
+    final icon = isSale ? Icons.check_circle : (isExpense ? Icons.receipt_long : Icons.shopping_cart);
 
     final subtitle = isReverted ? '${a.sub}\n(REVERTED)' : a.sub;
 
@@ -824,9 +850,7 @@ class _AdminScreenState extends State<AdminScreen> {
       ),
       subtitle: Text(
         subtitle,
-        style: TextStyle(
-          color: isReverted ? Colors.grey.shade700 : null,
-        ),
+        style: TextStyle(color: isReverted ? Colors.grey.shade700 : null),
       ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -883,418 +907,757 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
+  // =======================
+  // USERS CRUD UI
+  // =======================
+
+  Future<void> _openCreateUserDialog() async {
+    final userC = TextEditingController();
+    final passC = TextEditingController();
+    String role = 'worker';
+    bool hide = true;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Shto User', style: TextStyle(fontWeight: FontWeight.w900)),
+          content: SizedBox(
+            width: 520,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: userC,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: passC,
+                  obscureText: hide,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      onPressed: () => setLocal(() => hide = !hide),
+                      icon: Icon(hide ? Icons.visibility : Icons.visibility_off),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: role,
+                  items: const [
+                    DropdownMenuItem(value: 'worker', child: Text('worker')),
+                    DropdownMenuItem(value: 'admin', child: Text('admin')),
+                  ],
+                  onChanged: (v) => setLocal(() => role = v ?? 'worker'),
+                  decoration: const InputDecoration(
+                    labelText: 'Role',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Anulo')),
+            FilledButton.icon(
+              onPressed: () async {
+                try {
+                  await LocalApi.I.createUser(
+                    username: userC.text,
+                    password: passC.text,
+                    role: role,
+                  );
+                  if (!mounted) return;
+                  Navigator.pop(ctx);
+                  await _loadUsers();
+                  await _showSuccessDialog('User u kriju ✅');
+                } catch (e) {
+                  _showError('$e');
+                }
+              },
+              icon: const Icon(Icons.person_add),
+              label: const Text('KRIJO'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openEditUserDialog(AppUser u0) async {
+    final userC = TextEditingController(text: u0.username);
+    final passC = TextEditingController();
+    String role = u0.role;
+    bool hide = true;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Edit User', style: TextStyle(fontWeight: FontWeight.w900)),
+          content: SizedBox(
+            width: 520,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: userC,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: passC,
+                  obscureText: hide,
+                  decoration: InputDecoration(
+                    labelText: 'Password (opsional)',
+                    hintText: 'lëre zbrazët nëse s’do me ndrru',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      onPressed: () => setLocal(() => hide = !hide),
+                      icon: Icon(hide ? Icons.visibility : Icons.visibility_off),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  value: role,
+                  items: const [
+                    DropdownMenuItem(value: 'worker', child: Text('worker')),
+                    DropdownMenuItem(value: 'admin', child: Text('admin')),
+                  ],
+                  onChanged: (v) => setLocal(() => role = v ?? u0.role),
+                  decoration: const InputDecoration(
+                    labelText: 'Role',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Anulo')),
+            FilledButton.icon(
+              onPressed: () async {
+                try {
+                  final newUser = userC.text.trim();
+                  if (newUser.isEmpty) {
+                    _showError('Username s’bon me kon zbrazët.');
+                    return;
+                  }
+
+                  await LocalApi.I.updateUser(
+                    userId: u0.id,
+                    username: newUser,
+                    password: passC.text.trim().isEmpty ? null : passC.text.trim(),
+                    role: role,
+                  );
+
+                  if (!mounted) return;
+                  Navigator.pop(ctx);
+                  await _loadUsers();
+                  await _showSuccessDialog('User u përditësu ✅');
+                } catch (e) {
+                  _showError('$e');
+                }
+              },
+              icon: const Icon(Icons.save),
+              label: const Text('RUAJ'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmDeleteUser(AppUser u) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Fshij user?', style: TextStyle(fontWeight: FontWeight.w900)),
+        content: Text('Je i sigurt qe do me fshi "${u.username}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Anulo')),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.delete_forever),
+            label: const Text('Fshij'),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<void> _deleteUser(AppUser u) async {
+    final ok = await _confirmDeleteUser(u);
+    if (!ok) return;
+
+    setState(() => usersLoading = true);
+    try {
+      await LocalApi.I.deleteUser(u.id);
+      await _loadUsers();
+      await _showSuccessDialog('User u fshi ✅');
+    } catch (e) {
+      _showError('Gabim: $e');
+    } finally {
+      if (mounted) setState(() => usersLoading = false);
+    }
+  }
+
+  // =======================
+  // UI
+  // =======================
+
   @override
   Widget build(BuildContext context) {
     final s = stats;
-    final today = DateTime.now();
-
-    final salesToday = (s?.totalSalesToday ?? 0).toDouble();
-    final salesMonth = (s?.totalSalesMonth ?? 0).toDouble();
-    final salesAll = (s?.totalSalesAll ?? 0).toDouble();
-
-    final profitToday = (s?.totalProfitToday ?? 0).toDouble();
-    final profitMonth = (s?.totalProfitMonth ?? 0).toDouble();
-    final profitAll = (s?.totalProfitAll ?? 0).toDouble();
-
-    final countToday = (s?.countSalesToday ?? 0);
-    final countMonth = (s?.countSalesMonth ?? 0);
-    final countAll = (s?.countSalesAll ?? 0);
-
-    final investToday = (s?.totalInvestToday ?? 0).toDouble();
-    final investMonth = (s?.totalInvestMonth ?? 0).toDouble();
-    final investAll = (s?.totalInvestAll ?? 0).toDouble();
-
-    final expToday = (s?.totalExpensesToday ?? 0).toDouble();
-    final expMonth = (s?.totalExpensesMonth ?? 0).toDouble();
-    final expAll = (s?.totalExpensesAll ?? 0).toDouble();
-
-    // ✅ SHTESA: Shpenzime + Investime
-    final outToday = investToday + expToday;
-    final outMonth = investMonth + expMonth;
-    final outAll = investAll + expAll;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Panel'),
-        actions: [
-          PopupMenuButton<_ReportScope>(
-            tooltip: 'Print / PDF',
-            icon: const Icon(Icons.print),
-            onSelected: (scope) async {
-              await _printOrSaveReport(scope, saveAsPdf: false);
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: _ReportScope.day,
-                child: Text('Print Dita (Sot)'),
-              ),
-              PopupMenuItem(
-                value: _ReportScope.month,
-                child: Text('Print Muaji (i zgjedhur)'),
-              ),
-              PopupMenuItem(
-                value: _ReportScope.year,
-                child: Text('Print Viti (i zgjedhur)'),
-              ),
-              PopupMenuItem(
-                value: _ReportScope.total,
-                child: Text('Print Total (Gjithsej)'),
-              ),
-            ],
-          ),
-          IconButton(
-            tooltip: 'Ruaj si PDF (Muaji)',
-            icon: const Icon(Icons.picture_as_pdf),
-            onPressed: () async {
-              await _printOrSaveReport(_ReportScope.month, saveAsPdf: true);
-            },
-          ),
-          IconButton(
-            tooltip: 'Expenses',
-            onPressed: _openExpenseDialog,
-            icon: const Icon(Icons.receipt_long),
-          ),
-          IconButton(
-            tooltip: 'Investim',
-            onPressed: _openInvestDialog,
-            icon: const Icon(Icons.add_circle),
-          ),
-          IconButton(onPressed: _loadAll, icon: const Icon(Icons.refresh)),
-          const SizedBox(width: 6),
-        ],
-      ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.calendar_month),
-                title: Text(
-                  _formatMonthLabel(selectedMonth),
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                subtitle: const Text('Filter për statistika mujore'),
-                trailing: const Icon(Icons.expand_more),
-                onTap: _changeMonth,
-              ),
+      backgroundColor: AppTheme.bg,
+      body: Row(
+        children: [
+          // Sidebar
+          Container(
+            width: 240,
+            decoration: const BoxDecoration(
+              color: AppTheme.surface2,
+              border: Border(right: BorderSide(color: AppTheme.stroke, width: 1)),
             ),
-            const SizedBox(height: 10),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Statistikat (Sot / Muaj / Total)',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-                    ),
-                    const SizedBox(height: 10),
-                    _tripleHeader(
-                      left: 'SOT • ${_formatDayLabel(today)}',
-                      mid: _formatMonthLabel(selectedMonth),
-                      right: 'TOTAL',
-                    ),
-                    const SizedBox(height: 10),
-                    _tripleRow(
-                      label: 'Shitje',
-                      left: _money(salesToday),
-                      mid: _money(salesMonth),
-                      right: _money(salesAll),
-                      leftColor: Colors.green,
-                      midColor: Colors.blue,
-                      rightColor: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    const SizedBox(height: 8),
-                    _tripleRow(
-                      label: 'Fitim',
-                      left: _money(profitToday),
-                      mid: _money(profitMonth),
-                      right: _money(profitAll),
-                      leftColor: Colors.green,
-                      midColor: Colors.blue,
-                      rightColor: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    const SizedBox(height: 8),
-                    _tripleRow(
-                      label: 'Nr. shitjesh',
-                      left: '$countToday',
-                      mid: '$countMonth',
-                      right: '$countAll',
-                      leftColor: Theme.of(context).colorScheme.onSurface,
-                      midColor: Theme.of(context).colorScheme.onSurface,
-                      rightColor: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    const SizedBox(height: 8),
-                    _tripleRow(
-                      label: 'Investim',
-                      left: _money(investToday),
-                      mid: _money(investMonth),
-                      right: _money(investAll),
-                      leftColor: Colors.red,
-                      midColor: Colors.red,
-                      rightColor: Colors.red,
-                    ),
-                    const SizedBox(height: 8),
-                    _tripleRow(
-                      label: 'Shpenzimet',
-                      left: _money(expToday),
-                      mid: _money(expMonth),
-                      right: _money(expAll),
-                      leftColor: Colors.deepOrange,
-                      midColor: Colors.deepOrange,
-                      rightColor: Colors.deepOrange,
-                    ),
-
-                    // ✅ SHTESA: Shpenzime + Investime
-                    const SizedBox(height: 8),
-                    _tripleRow(
-                      label: 'Shpenzime + Investime',
-                      left: _money(outToday),
-                      mid: _money(outMonth),
-                      right: _money(outAll),
-                      leftColor: Colors.purple,
-                      midColor: Colors.purple,
-                      rightColor: Colors.purple,
-                    ),
-
-                    const SizedBox(height: 12),
-                    const Divider(height: 1),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        _statCard(
-                          'Stok Total (Copë)',
-                          '${s?.totalStock ?? 0}',
-                          Icons.inventory_2,
-                        ),
-                        _statCard(
-                          'Vlera e Stokut (Final)',
-                          _money((s?.totalStockValueFinal ?? 0).toDouble()),
-                          Icons.euro,
-                          tint: Colors.green,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTheme.success,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: _openInvestDialog,
-                    icon: const Icon(Icons.add_circle),
-                    label: const Text('Shto Investim'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: _openExpenseDialog,
-                    icon: const Icon(Icons.receipt_long),
-                    label: const Text('Shto Shpenzim'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text(
-                  'Regjistrimet e fundit',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-                ),
-                Text(
-                  '(slide -> revert)',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (activity.isEmpty)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(14),
-                  child: Text('S’ka regjistrime ende.'),
-                ),
-              )
-            else
-              ...activity.map(_activityTile),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _tripleHeader({
-    required String left,
-    required String mid,
-    required String right,
-  }) {
-    final t = Theme.of(context).textTheme;
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            left,
-            textAlign: TextAlign.center,
-            style: t.labelMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: Colors.green,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            mid,
-            textAlign: TextAlign.center,
-            style: t.labelMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: Colors.blue,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            right,
-            textAlign: TextAlign.center,
-            style: t.labelMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _tripleRow({
-    required String label,
-    required String left,
-    required String mid,
-    required String right,
-    required Color leftColor,
-    required Color midColor,
-    required Color rightColor,
-  }) {
-    final t = Theme.of(context).textTheme;
-
-    Widget cell(String v, Color c) {
-      return Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.45),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.7),
-            ),
-          ),
-          child: Text(
-            v,
-            textAlign: TextAlign.center,
-            style: t.titleSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              color: c,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w900)),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            cell(left, leftColor),
-            const SizedBox(width: 8),
-            cell(mid, midColor),
-            const SizedBox(width: 8),
-            cell(right, rightColor),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _statCard(String title, String value, IconData icon, {Color? tint}) {
-    final c = tint ?? Theme.of(context).colorScheme.onSurface;
-    return SizedBox(
-      width: 260,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(icon, color: c),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                  const Text(
+                    'ADMIN',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      color: AppTheme.text,
+                      letterSpacing: 0.5,
                     ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Divider(color: AppTheme.stroke, height: 1),
+                  const SizedBox(height: 10),
+                  _sideBtn(
+                    icon: Icons.dashboard_rounded,
+                    label: 'Dashboard',
+                    active: tab == _AdminTab.dashboard,
+                    onTap: () => setState(() => tab = _AdminTab.dashboard),
+                  ),
+                  const SizedBox(height: 8),
+                  _sideBtn(
+                    icon: Icons.people_alt_rounded,
+                    label: 'Users',
+                    active: tab == _AdminTab.users,
+                    onTap: () async {
+                      setState(() => tab = _AdminTab.users);
+                      if (users.isEmpty) {
+                        await _loadUsers();
+                      }
+                    },
+                  ),
+                  const Spacer(),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.text,
+                      side: const BorderSide(color: AppTheme.stroke),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () => doLogout(context),
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Logout', style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              Text(
-                value,
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18,
-                  color: c,
-                ),
-              ),
-            ],
+            ),
           ),
+
+          // Content
+          Expanded(
+            child: loading
+                ? const Center(child: CircularProgressIndicator())
+                : Padding(
+              padding: const EdgeInsets.all(18),
+              child: tab == _AdminTab.dashboard ? _dashboardView(s) : _usersView(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sideBtn({
+    required IconData icon,
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: active ? AppTheme.surface.withOpacity(0.55) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: active ? AppTheme.primaryPurple.withOpacity(0.6) : AppTheme.stroke),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: active ? AppTheme.primaryPurple : AppTheme.text),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppTheme.text,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  String _formatMonthLabel(String mk) {
-    final parts = mk.split('-');
-    if (parts.length != 2) return mk;
-    final y = parts[0];
-    final m = int.tryParse(parts[1]) ?? 1;
-    const names = [
-      'Janar',
-      'Shkurt',
-      'Mars',
-      'Prill',
-      'Maj',
-      'Qershor',
-      'Korrik',
-      'Gusht',
-      'Shtator',
-      'Tetor',
-      'Nëntor',
-      'Dhjetor',
+  // ---------- DASHBOARD VIEW ----------
+  Widget _dashboardView(AdminStats? s) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+    // top bar
+    Row(
+    children: [
+    Text(
+    'Dashboard',
+      style: TextStyle(
+        color: AppTheme.text,
+        fontWeight: FontWeight.w900,
+        fontSize: 18,
+      ),
+    ),
+    const Spacer(),
+
+    // month picker
+    OutlinedButton.icon(
+    onPressed: _changeMonth,
+    icon: const Icon(Icons.calendar_month),
+    label: Text(_formatMonthLabel(selectedMonth)),
+    style: OutlinedButton.styleFrom(
+    foregroundColor: AppTheme.text,
+    side: const BorderSide(color: AppTheme.stroke),
+    ),
+    ),
+    const SizedBox(width: 10),
+
+    // invest / expense
+    FilledButton.icon(
+    onPressed: _openInvestDialog,
+    icon: const Icon(Icons.add_shopping_cart),
+    label: const Text('Investim'),
+    ),
+    const SizedBox(width: 10),
+    FilledButton.icon(
+    style: FilledButton.styleFrom(backgroundColor: Colors.deepOrange),
+    onPressed: _openExpenseDialog,
+    icon: const Icon(Icons.receipt_long),
+    label: const Text('Shpenzim'),
+    ),
+    ],
+    ),
+
+    const SizedBox(height: 14),
+
+    // report buttons
+    Wrap(
+    spacing: 10,
+    runSpacing: 10,
+    children: [
+    _reportBtn('Print Ditor', Icons.print, () => _printOrSaveReport(_ReportScope.day, saveAsPdf: false)),
+    _reportBtn('Save Ditor PDF', Icons.save_alt, () => _printOrSaveReport(_ReportScope.day, saveAsPdf: true)),
+    _reportBtn('Print Mujor', Icons.print, () => _printOrSaveReport(_ReportScope.month, saveAsPdf: false)),
+    _reportBtn('Save Mujor PDF', Icons.save_alt, () => _printOrSaveReport(_ReportScope.month, saveAsPdf: true)),
+    _reportBtn('Print Vjetor', Icons.print, () => _printOrSaveReport(_ReportScope.year, saveAsPdf: false)),
+    _reportBtn('Save Vjetor PDF', Icons.save_alt, () => _printOrSaveReport(_ReportScope.year, saveAsPdf: true)),
+    _reportBtn('Print Total', Icons.print, () => _printOrSaveReport(_ReportScope.total, saveAsPdf: false)),
+    _reportBtn('Save Total PDF', Icons.save_alt, () => _printOrSaveReport(_ReportScope.total, saveAsPdf: true)),
+    ],
+    ),
+
+    const SizedBox(height: 14),
+
+    // ✅ summary cards -> 3 columns (LEFT=Sot, MID=Muaji, RIGHT=Total) + responsive
+    if (s != null)
+    LayoutBuilder(
+    builder: (context, c) {
+    final w = c.maxWidth;
+
+    final todayCards = <Widget>[
+      _statCard('Sot Shitje', _money(s.totalSalesToday), Icons.payments, Colors.green),
+
+      // ✅ COUNT SHITJESH
+      _statCard(
+        'Sot Nr. Shitjesh',
+        '${s.countSalesToday}',
+        Icons.confirmation_number,
+        Colors.green.shade700,
+      ),
+
+      _statCard('Sot Fitim', _money(s.totalProfitToday), Icons.trending_up, Colors.green.shade800),
+      _statCard('Sot Investim', _money(s.totalInvestToday), Icons.shopping_cart_checkout, Colors.red),
+      _statCard(
+        'Sot Shpenzime (Inv + Shp)',
+        _money(s.totalInvestToday + s.totalExpensesToday),
+        Icons.money_off,
+        Colors.deepOrange,
+      ),
     ];
-    final idx = (m - 1).clamp(0, 11);
-    return '${names[idx]} $y';
+
+
+
+    final monthCards = <Widget>[
+      _statCard('Muji Shitje', _money(s.totalSalesMonth), Icons.calendar_month, Colors.blue),
+
+      // ✅ COUNT SHITJESH
+      _statCard(
+        'Muji Nr. Shitjesh',
+        '${s.countSalesMonth}',
+        Icons.confirmation_number,
+        Colors.blue.shade700,
+      ),
+
+      _statCard('Muji Fitim', _money(s.totalProfitMonth), Icons.assessment, Colors.blue.shade800),
+      _statCard('Muji Investim', _money(s.totalInvestMonth), Icons.shopping_cart_checkout, Colors.red),
+      _statCard(
+        'Muji Shpenzime (Inv + Shp)',
+        _money(s.totalInvestMonth + s.totalExpensesMonth),
+        Icons.money_off,
+        Colors.deepOrange,
+      ),
+    ];
+
+
+    final totalCards = <Widget>[
+      _statCard('Total Shitje', _money(s.totalSalesAll), Icons.all_inclusive, Colors.teal),
+
+      // ✅ COUNT SHITJESH
+      _statCard(
+        'Total Nr. Shitjesh',
+        '${s.countSalesAll}',
+        Icons.confirmation_number,
+        Colors.teal.shade700,
+      ),
+
+      _statCard('Total Fitim', _money(s.totalProfitAll), Icons.star, Colors.teal.shade800),
+
+      _statCard(
+        'Total Investim',
+        _money(s.totalInvestAll),
+        Icons.shopping_cart_checkout,
+        Colors.red,
+      ),
+
+      _statCard(
+        'Total Shpenzime (Inv + Shp)',
+        _money(s.totalInvestAll + s.totalExpensesAll),
+        Icons.money_off,
+        Colors.deepOrange,
+      ),
+    ];
+
+
+
+    // 1 column stack
+    if (w < 700) {
+    return Column(
+    children: [
+    _statsGroup('Sot', todayCards),
+    const SizedBox(height: 12),
+    _statsGroup('Muaji', monthCards),
+    const SizedBox(height: 12),
+    _statsGroup('Total', totalCards),
+    ],
+    );
+    }
+
+    // 2 columns: left has Sot+Muaji, right has Total
+    if (w < 1050) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              children: [
+                _statsGroup('Sot', todayCards),
+                const SizedBox(height: 12),
+                _statsGroup('Muaji', monthCards),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: _statsGroup('Total', totalCards)),
+        ],
+      );
+    }
+
+    // 3 columns
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: _statsGroup('Sot', todayCards)),
+        const SizedBox(width: 12),
+        Expanded(child: _statsGroup('Muaji', monthCards)),
+        const SizedBox(width: 12),
+        Expanded(child: _statsGroup('Total', totalCards)),
+      ],
+    );
+    },
+    ),
+
+        const SizedBox(height: 14),
+
+        // activity
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.stroke),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Aktiviteti i fundit',
+                  style: TextStyle(
+                    color: AppTheme.text,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: activity.isEmpty
+                      ? Center(
+                    child: Text(
+                      'S’ka aktivitet.',
+                      style: TextStyle(
+                        color: AppTheme.muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                      : ListView.builder(
+                    itemCount: activity.length,
+                    itemBuilder: (_, i) => _activityTile(activity[i]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------- USERS VIEW ----------
+  Widget _usersView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Users',
+              style: TextStyle(
+                color: AppTheme.text,
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+              ),
+            ),
+            const Spacer(),
+            FilledButton.icon(
+              onPressed: _openCreateUserDialog,
+              icon: const Icon(Icons.person_add),
+              label: const Text('Shto user'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.stroke),
+            ),
+            child: usersLoading
+                ? const Center(child: CircularProgressIndicator())
+                : users.isEmpty
+                ? Center(
+              child: Text(
+                'S’ka usera.',
+                style: TextStyle(
+                  color: AppTheme.muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+                : ListView.separated(
+              itemCount: users.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) {
+                final u = users[i];
+
+                return Slidable(
+                  key: ValueKey('user-${u.id}'),
+                  endActionPane: ActionPane(
+                    motion: const DrawerMotion(),
+                    extentRatio: 0.42,
+                    children: [
+                      SlidableAction(
+                        onPressed: (_) => _openEditUserDialog(u),
+                        backgroundColor: Colors.blueGrey,
+                        foregroundColor: Colors.white,
+                        icon: Icons.edit,
+                        label: 'Edit',
+                      ),
+                      SlidableAction(
+                        onPressed: (_) => _deleteUser(u),
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        icon: Icons.delete_forever,
+                        label: 'Fshij',
+                      ),
+                    ],
+                  ),
+                  child: Card(
+                    margin: EdgeInsets.zero,
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppTheme.primaryPurple.withOpacity(0.15),
+                        child: Icon(
+                          u.role == 'admin' ? Icons.shield : Icons.person,
+                          color: AppTheme.primaryPurple,
+                        ),
+                      ),
+                      title: Text(
+                        u.username,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                      subtitle: Text(
+                        'Role: ${u.role}',
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'Edit',
+                            onPressed: () => _openEditUserDialog(u),
+                            icon: const Icon(Icons.edit),
+                          ),
+                          IconButton(
+                            tooltip: 'Fshij',
+                            onPressed: () => _deleteUser(u),
+                            icon: const Icon(Icons.delete_forever),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------- UI helpers ----------
+  Widget _reportBtn(String label, IconData icon, VoidCallback onTap) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.w900)),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppTheme.text,
+        side: const BorderSide(color: AppTheme.stroke),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      ),
+    );
+  }
+
+  Widget _statCard(String title, String value, IconData icon, Color accent) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.stroke),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: accent.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: accent.withOpacity(0.35)),
+            ),
+            child: Icon(icon, color: accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: AppTheme.muted,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: AppTheme.text,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
+// =======================
+// SUCCESS POPUP WIDGET
+// =======================
 class _SuccessPopup extends StatelessWidget {
   final String message;
   const _SuccessPopup({required this.message});
@@ -1302,42 +1665,47 @@ class _SuccessPopup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 320,
-      padding: const EdgeInsets.all(16),
+      width: 420,
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: AppTheme.surface,              // ✅ jo white
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.6),
-        ),
-        boxShadow: const [
-          BoxShadow(blurRadius: 18, spreadRadius: 2, color: Color(0x33000000)),
+        border: Border.all(color: AppTheme.stroke),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 18,
+            spreadRadius: 2,
+            color: Colors.black.withOpacity(0.35),
+            offset: const Offset(0, 10),
+          ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
           Container(
-            width: 64,
-            height: 64,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(18),
+              color: AppTheme.success.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.success.withOpacity(0.35)),
             ),
-            child: const Icon(
-              Icons.check_circle,
-              color: Colors.green,
-              size: 42,
-            ),
+            child: const Icon(Icons.check_circle, color: AppTheme.success),
           ),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: AppTheme.text,         // ✅ tekst i dukshëm
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 }
+

@@ -1,12 +1,25 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shoe_store_manager/models/app_user.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-const int kDbVersion = 4;
+const int kDbVersion = 6;
 
 /* ======================= SQL ======================= */
+
+const String kSqlCreateUsers = '''
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  password TEXT NOT NULL,
+  role TEXT NOT NULL,               -- 'admin' | 'worker'
+  active INTEGER NOT NULL DEFAULT 1,
+  createdAtMs INTEGER NOT NULL
+);
+''';
 
 const String kSqlCreateProducts = '''
 CREATE TABLE IF NOT EXISTS products (
@@ -73,6 +86,7 @@ CREATE TABLE IF NOT EXISTS investments (
 const String kSqlCreateExpenses = '''
 CREATE TABLE IF NOT EXISTS expenses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER,
   category TEXT NOT NULL,
   amount REAL NOT NULL,
   note TEXT,
@@ -86,6 +100,7 @@ CREATE TABLE IF NOT EXISTS expenses (
 /* ======================= HELPERS ======================= */
 
 double round2(num n) => (n * 100).roundToDouble() / 100;
+
 double clampDouble(double v, double min, double max) =>
     v < min ? min : (v > max ? max : v);
 
@@ -97,9 +112,9 @@ double calcFinalPrice({
   required double price,
   required double discountPercent,
 }) {
-  final p = price.isFinite ? price : 0;
-  final d = clampDouble(discountPercent.isFinite ? discountPercent : 0, 0, 100);
-  return round2(p * (1 - d / 100));
+  final p0 = price.isFinite ? price : 0;
+  final d0 = clampDouble(discountPercent.isFinite ? discountPercent : 0, 0, 100);
+  return round2(p0 * (1 - d0 / 100));
 }
 
 Map<int, int> _decodeSizeStock(String? raw) {
@@ -145,15 +160,11 @@ class Product {
   final String? serialNumber;
   final double price;
   final double? purchasePrice;
-
   final int stockQty;
-
   final double discountPercent;
   final bool active;
   final String? imagePath;
-
   final Map<int, int> sizeStock;
-
   final int? createdAtMs;
   final int? updatedAtMs;
 
@@ -176,11 +187,16 @@ class Product {
   double get finalPrice =>
       calcFinalPrice(price: price, discountPercent: discountPercent);
 
+  // ✅ UI kërkon shpesh "sizeSorted"
   List<int> get sizesSorted {
     final s = sizeStock.keys.toList()..sort();
     return s;
   }
 
+  // ✅ alias për erroret: "sizeSorted isn't defined"
+  List<int> get sizeSorted => sizesSorted;
+
+  // ✅ UI error: qtyForSize missing
   int qtyForSize(int size) => sizeStock[size] ?? 0;
 
   static Product fromRow(Map<String, Object?> r) {
@@ -216,9 +232,7 @@ class ActivityItem {
   final String title;
   final String sub;
   final double amount;
-
   final int? refId;
-
   final bool reverted;
 
   const ActivityItem({
@@ -234,6 +248,7 @@ class ActivityItem {
 
 class ExpenseDoc {
   final int id;
+  final int? userId;
   final String category;
   final double amount;
   final String? note;
@@ -244,6 +259,7 @@ class ExpenseDoc {
 
   const ExpenseDoc({
     required this.id,
+    required this.userId,
     required this.category,
     required this.amount,
     this.note,
@@ -255,6 +271,7 @@ class ExpenseDoc {
 
   static ExpenseDoc fromRow(Map<String, Object?> r) => ExpenseDoc(
     id: (r['id'] as int),
+    userId: r['userId'] as int?,
     category: (r['category'] as String?) ?? '',
     amount: ((r['amount'] as num?) ?? 0).toDouble(),
     note: r['note'] as String?,
@@ -308,6 +325,30 @@ class AdminStats {
   });
 }
 
+class YearStats {
+  final int year;
+  final double sales;
+  final double profit;
+  final double investments;
+  final double expenses;
+  final int countSales;
+
+  const YearStats({
+    required this.year,
+    required this.sales,
+    required this.profit,
+    required this.investments,
+    required this.expenses,
+    required this.countSales,
+  });
+
+  // ✅ aliases për UI që pret totalX
+  double get totalSales => sales;
+  double get totalProfit => profit;
+  double get totalInvest => investments;
+  double get totalExpenses => expenses;
+}
+
 class SellResult {
   final int saleId;
   final String invoiceNo;
@@ -340,15 +381,13 @@ class LocalApi {
   }
 
   Future<void> _tryAddColumn(
-    Database d, {
-    required String table,
-    required String columnSql,
-  }) async {
+      Database d, {
+        required String table,
+        required String columnSql,
+      }) async {
     try {
       await d.execute('ALTER TABLE $table ADD COLUMN $columnSql');
-    } catch (_) {
-      // ignore
-    }
+    } catch (_) {}
   }
 
   Future<Database> _open() async {
@@ -361,6 +400,7 @@ class LocalApi {
       dbPath,
       version: kDbVersion,
       onCreate: (d, v) async {
+        await d.execute(kSqlCreateUsers);
         await d.execute(kSqlCreateProducts);
         await d.execute(kSqlCreateSales);
         await d.execute(kSqlCreateSaleItems);
@@ -368,77 +408,37 @@ class LocalApi {
         await d.execute(kSqlCreateExpenses);
       },
       onUpgrade: (d, oldV, newV) async {
+        await d.execute(kSqlCreateUsers);
         await d.execute(kSqlCreateProducts);
         await d.execute(kSqlCreateSales);
         await d.execute(kSqlCreateSaleItems);
         await d.execute(kSqlCreateInvestments);
         await d.execute(kSqlCreateExpenses);
 
-        if (oldV < 2) {
-          await _tryAddColumn(
-            d,
-            table: 'products',
-            columnSql: 'sizeStockJson TEXT',
-          );
-        }
-        if (oldV < 3) {
-          await _tryAddColumn(
-            d,
-            table: 'sale_items',
-            columnSql: 'shoeSize INTEGER',
-          );
-        }
-        if (oldV < 4) {
-          await _tryAddColumn(
-            d,
-            table: 'sales',
-            columnSql: 'revertedAtMs INTEGER',
-          );
-          await _tryAddColumn(
-            d,
-            table: 'investments',
-            columnSql: 'revertedAtMs INTEGER',
-          );
-          await _tryAddColumn(
-            d,
-            table: 'expenses',
-            columnSql: 'revertedAtMs INTEGER',
-          );
-        }
+        // columns for old dbs
+        await _tryAddColumn(d, table: 'products', columnSql: 'sizeStockJson TEXT');
+        await _tryAddColumn(d, table: 'sale_items', columnSql: 'shoeSize INTEGER');
+
+        await _tryAddColumn(d, table: 'sales', columnSql: 'revertedAtMs INTEGER');
+        await _tryAddColumn(d, table: 'investments', columnSql: 'revertedAtMs INTEGER');
+        await _tryAddColumn(d, table: 'expenses', columnSql: 'revertedAtMs INTEGER');
+        await _tryAddColumn(d, table: 'expenses', columnSql: 'userId INTEGER');
       },
       onOpen: (d) async {
+        await d.execute(kSqlCreateUsers);
         await d.execute(kSqlCreateProducts);
         await d.execute(kSqlCreateSales);
         await d.execute(kSqlCreateSaleItems);
         await d.execute(kSqlCreateInvestments);
         await d.execute(kSqlCreateExpenses);
 
-        await _tryAddColumn(
-          d,
-          table: 'products',
-          columnSql: 'sizeStockJson TEXT',
-        );
-        await _tryAddColumn(
-          d,
-          table: 'sale_items',
-          columnSql: 'shoeSize INTEGER',
-        );
+        await _tryAddColumn(d, table: 'products', columnSql: 'sizeStockJson TEXT');
+        await _tryAddColumn(d, table: 'sale_items', columnSql: 'shoeSize INTEGER');
 
-        await _tryAddColumn(
-          d,
-          table: 'sales',
-          columnSql: 'revertedAtMs INTEGER',
-        );
-        await _tryAddColumn(
-          d,
-          table: 'investments',
-          columnSql: 'revertedAtMs INTEGER',
-        );
-        await _tryAddColumn(
-          d,
-          table: 'expenses',
-          columnSql: 'revertedAtMs INTEGER',
-        );
+        await _tryAddColumn(d, table: 'sales', columnSql: 'revertedAtMs INTEGER');
+        await _tryAddColumn(d, table: 'investments', columnSql: 'revertedAtMs INTEGER');
+        await _tryAddColumn(d, table: 'expenses', columnSql: 'revertedAtMs INTEGER');
+        await _tryAddColumn(d, table: 'expenses', columnSql: 'userId INTEGER');
       },
     );
 
@@ -452,11 +452,150 @@ class LocalApi {
     if (db != null) await db.close();
   }
 
-  /* ---------------- PRODUCTS ---------------- */
+  // ================= USERS / AUTH =================
 
-  Future<List<Product>> getProducts({
-    String orderBy = 'createdAtMs DESC',
+  /// ✅ Krijon admin default nëse s’ka asnjë admin.
+  /// username: admin , password: 1234
+  Future<void> ensureDefaultAdmin() async {
+    final db = await _open();
+    final rows = await db.rawQuery("SELECT id FROM users WHERE role='admin' LIMIT 1");
+    if (rows.isNotEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await db.insert('users', {
+      'username': 'admin',
+      'password': '1234',
+      'role': 'admin',
+      'active': 1,
+      'createdAtMs': now,
+    });
+  }
+
+  /// ✅ Login me username+password
+  Future<AppUser> login({
+    required String username,
+    required String password,
   }) async {
+    final db = await _open();
+    final u = username.trim();
+    final p0 = password;
+    if (u.isEmpty) throw Exception('Shkruaj username.');
+    if (p0.isEmpty) throw Exception('Shkruaj password.');
+
+    final rows = await db.query(
+      'users',
+      where: 'username = ? AND password = ? AND active = 1',
+      whereArgs: [u, p0],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      throw Exception('User nuk ekziston ose password gabim.');
+    }
+    return AppUser.fromRow(rows.first);
+  }
+
+  /// ✅ vetëm active (default)
+  Future<List<AppUser>> getUsers({bool onlyActive = true}) async {
+    final db = await _open();
+    final rows = await db.query(
+      'users',
+      where: onlyActive ? 'active = 1' : null,
+      orderBy: 'createdAtMs DESC',
+    );
+    return rows.map(AppUser.fromRow).toList();
+  }
+
+  /// ✅ krejt userat (edhe inactive) – për Admin CRUD
+  Future<List<AppUser>> getAllUsers() async {
+    final db = await _open();
+    final rows = await db.query('users', orderBy: 'createdAtMs DESC');
+    return rows.map(AppUser.fromRow).toList();
+  }
+
+  /// role: 'worker' | 'admin'
+  Future<int> createUser({
+    required String username,
+    required String password,
+    required String role,
+  }) async {
+    final db = await _open();
+    final u = username.trim();
+    if (u.isEmpty) throw Exception('Username i zbrazët.');
+    if (password.isEmpty) throw Exception('Password i zbrazët.');
+    if (role != 'worker' && role != 'admin') throw Exception('Role invalid.');
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    try {
+      return await db.insert('users', {
+        'username': u,
+        'password': password,
+        'role': role,
+        'active': 1,
+        'createdAtMs': now,
+      });
+    } catch (_) {
+      throw Exception('Username ekziston already.');
+    }
+  }
+  Future<Directory> _imagesDir() async {
+    final dir = await getApplicationSupportDirectory(); // desktop-safe
+    final images = Directory(p.join(dir.path, 'shoe_store_manager', 'images'));
+    if (!await images.exists()) {
+      await images.create(recursive: true);
+    }
+    return images;
+  }
+  /// ✅ Update user (password opsional)
+  Future<void> updateUser({
+    required int userId,
+    required String username,
+    String? password, // null/empty -> mos e ndrron
+    required String role, // 'admin' | 'worker'
+  }) async {
+    final db = await _open();
+    final u = username.trim();
+    final r = role.trim();
+    if (u.isEmpty) throw Exception('Username i zbrazët.');
+    if (r != 'worker' && r != 'admin') throw Exception('Role invalid.');
+
+    final data = <String, Object?>{'username': u, 'role': r};
+    final p0 = password?.trim();
+    if (p0 != null && p0.isNotEmpty) data['password'] = p0;
+
+    try {
+      await db.update('users', data, where: 'id = ?', whereArgs: [userId]);
+    } catch (_) {
+      throw Exception('Username ekziston already.');
+    }
+  }
+
+  Future<void> setUserActive(int userId, bool active) async {
+    final db = await _open();
+    await db.update(
+      'users',
+      {'active': active ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  Future<void> deleteUser(int userId) async {
+    final db = await _open();
+    await db.delete('users', where: 'id = ?', whereArgs: [userId]);
+  }
+
+  Future<AppUser?> getUserById(int userId) async {
+    final db = await _open();
+    final rows = await db.query('users', where: 'id = ?', whereArgs: [userId], limit: 1);
+    if (rows.isEmpty) return null;
+    return AppUser.fromRow(rows.first);
+  }
+
+  // ================= PRODUCTS =================
+
+  Future<List<Product>> getProducts({String orderBy = 'createdAtMs DESC'}) async {
     final db = await _open();
     final rows = await db.query('products', orderBy: orderBy);
     return rows.map(Product.fromRow).toList();
@@ -475,15 +614,12 @@ class LocalApi {
   }) async {
     final db = await _open();
     final now = DateTime.now().millisecondsSinceEpoch;
-
     final total = _totalStock(sizeStock);
 
     final map = {
       'name': name.trim(),
       'sku': (sku?.trim().isEmpty ?? true) ? null : sku!.trim(),
-      'serialNumber': (serialNumber?.trim().isEmpty ?? true)
-          ? null
-          : serialNumber!.trim(),
+      'serialNumber': (serialNumber?.trim().isEmpty ?? true) ? null : serialNumber!.trim(),
       'price': round2(price),
       'purchasePrice': purchasePrice == null ? null : round2(purchasePrice),
       'stockQty': total,
@@ -512,15 +648,12 @@ class LocalApi {
   }) async {
     final db = await _open();
     final now = DateTime.now().millisecondsSinceEpoch;
-
     final total = _totalStock(sizeStock);
 
     final map = {
       'name': name.trim(),
       'sku': (sku?.trim().isEmpty ?? true) ? null : sku!.trim(),
-      'serialNumber': (serialNumber?.trim().isEmpty ?? true)
-          ? null
-          : serialNumber!.trim(),
+      'serialNumber': (serialNumber?.trim().isEmpty ?? true) ? null : serialNumber!.trim(),
       'price': round2(price),
       'purchasePrice': purchasePrice == null ? null : round2(purchasePrice),
       'stockQty': total,
@@ -539,6 +672,7 @@ class LocalApi {
     await db.delete('products', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// ✅ toggleActive (error i yt)
   Future<void> toggleActive(int id, bool active) async {
     final db = await _open();
     await db.update(
@@ -552,6 +686,7 @@ class LocalApi {
     );
   }
 
+  /// ✅ searchProductsBySerialOrName (error i yt)
   Future<List<Product>> searchProductsBySerialOrName(String q) async {
     final db = await _open();
     final s = q.trim();
@@ -568,7 +703,7 @@ class LocalApi {
     return rows.map(Product.fromRow).toList();
   }
 
-  /* ---------------- SELL ---------------- */
+  // ================= SELL (one item) =================
 
   Future<SellResult> sellOne({
     required int productId,
@@ -648,40 +783,22 @@ class LocalApi {
     });
   }
 
-  /* ---------------- REVERT ---------------- */
+  // ================= REVERT =================
 
-  /// ✅ Revert SALE: e kthen stokun mbrapsht (me size) dhe e shënon revertedAtMs
   Future<void> revertSale({required int saleId}) async {
     final db = await _open();
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
     await db.transaction((tx) async {
-      final saleRows = await tx.query(
-        'sales',
-        where: 'id = ?',
-        whereArgs: [saleId],
-        limit: 1,
-      );
+      final saleRows = await tx.query('sales', where: 'id = ?', whereArgs: [saleId], limit: 1);
       if (saleRows.isEmpty) throw Exception('Shitja nuk ekziston.');
 
       final revertedAt = saleRows.first['revertedAtMs'] as int?;
-      if (revertedAt != null)
-        throw Exception('Kjo shitje veç është revert-uar.');
+      if (revertedAt != null) throw Exception('Kjo shitje veç është revert-uar.');
 
-      final items = await tx.query(
-        'sale_items',
-        where: 'saleId = ?',
-        whereArgs: [saleId],
-      );
-
+      final items = await tx.query('sale_items', where: 'saleId = ?', whereArgs: [saleId]);
       if (items.isEmpty) {
-        // gjithsesi e shënojmë reverted, që mos me e pa si aktive
-        await tx.update(
-          'sales',
-          {'revertedAtMs': nowMs},
-          where: 'id = ?',
-          whereArgs: [saleId],
-        );
+        await tx.update('sales', {'revertedAtMs': nowMs}, where: 'id = ?', whereArgs: [saleId]);
         return;
       }
 
@@ -690,17 +807,11 @@ class LocalApi {
         final qty = (it['qty'] as int?) ?? 1;
         final shoeSize = it['shoeSize'] as int?;
 
-        final prodRows = await tx.query(
-          'products',
-          where: 'id = ?',
-          whereArgs: [productId],
-          limit: 1,
-        );
-        if (prodRows.isEmpty) continue; // produkt i fshirë
+        final prodRows = await tx.query('products', where: 'id = ?', whereArgs: [productId], limit: 1);
+        if (prodRows.isEmpty) continue;
 
         final p0 = Product.fromRow(prodRows.first);
 
-        // ✅ nëse kemi shoeSize, e kthejm sizeStock
         if (shoeSize != null) {
           final map = Map<int, int>.from(p0.sizeStock);
           map[shoeSize] = (map[shoeSize] ?? 0) + qty;
@@ -717,7 +828,6 @@ class LocalApi {
             whereArgs: [productId],
           );
         } else {
-          // fallback për shitje të vjetra pa shoeSize
           await tx.update(
             'products',
             {'stockQty': p0.stockQty + qty, 'updatedAtMs': nowMs},
@@ -727,65 +837,33 @@ class LocalApi {
         }
       }
 
-      // ✅ shëno sale si reverted
-      await tx.update(
-        'sales',
-        {'revertedAtMs': nowMs},
-        where: 'id = ?',
-        whereArgs: [saleId],
-      );
+      await tx.update('sales', {'revertedAtMs': nowMs}, where: 'id = ?', whereArgs: [saleId]);
     });
   }
 
-  /// ✅ Revert INVEST (veç e shënon)
   Future<void> revertInvestment({required int investId}) async {
     final db = await _open();
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-    final rows = await db.query(
-      'investments',
-      where: 'id = ?',
-      whereArgs: [investId],
-      limit: 1,
-    );
+    final rows = await db.query('investments', where: 'id = ?', whereArgs: [investId], limit: 1);
     if (rows.isEmpty) throw Exception('Investimi nuk ekziston.');
-    final revertedAt = rows.first['revertedAtMs'] as int?;
-    if (revertedAt != null)
-      throw Exception('Ky investim veç është revert-uar.');
+    if (rows.first['revertedAtMs'] != null) throw Exception('Ky investim veç është revert-uar.');
 
-    await db.update(
-      'investments',
-      {'revertedAtMs': nowMs},
-      where: 'id = ?',
-      whereArgs: [investId],
-    );
+    await db.update('investments', {'revertedAtMs': nowMs}, where: 'id = ?', whereArgs: [investId]);
   }
 
-  /// ✅ Revert EXPENSE (veç e shënon)
   Future<void> revertExpense({required int expenseId}) async {
     final db = await _open();
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-    final rows = await db.query(
-      'expenses',
-      where: 'id = ?',
-      whereArgs: [expenseId],
-      limit: 1,
-    );
+    final rows = await db.query('expenses', where: 'id = ?', whereArgs: [expenseId], limit: 1);
     if (rows.isEmpty) throw Exception('Shpenzimi nuk ekziston.');
-    final revertedAt = rows.first['revertedAtMs'] as int?;
-    if (revertedAt != null)
-      throw Exception('Ky shpenzim veç është revert-uar.');
+    if (rows.first['revertedAtMs'] != null) throw Exception('Ky shpenzim veç është revert-uar.');
 
-    await db.update(
-      'expenses',
-      {'revertedAtMs': nowMs},
-      where: 'id = ?',
-      whereArgs: [expenseId],
-    );
+    await db.update('expenses', {'revertedAtMs': nowMs}, where: 'id = ?', whereArgs: [expenseId]);
   }
 
-  /* ---------------- INVESTMENTS ---------------- */
+  // ================= INVESTMENTS =================
 
   Future<void> addInvestment({required double amount, String? note}) async {
     final db = await _open();
@@ -804,9 +882,7 @@ class LocalApi {
     });
   }
 
-  Future<List<Map<String, Object?>>> getInvestments({
-    String? monthKeyFilter,
-  }) async {
+  Future<List<Map<String, Object?>>> getInvestments({String? monthKeyFilter}) async {
     final db = await _open();
     if (monthKeyFilter == null) {
       return db.query('investments', orderBy: 'createdAtMs DESC', limit: 200);
@@ -820,9 +896,10 @@ class LocalApi {
     );
   }
 
-  /* ---------------- EXPENSES ---------------- */
+  // ================= EXPENSES =================
 
   Future<void> addExpense({
+    int? userId, // ✅ opsional (mos ta prish askund, pranon edhe userId:0)
     required String category,
     required double amount,
     String? note,
@@ -836,6 +913,7 @@ class LocalApi {
     if (!amount.isFinite || amount <= 0) throw Exception('Amount invalid.');
 
     await db.insert('expenses', {
+      'userId': userId,
       'category': cat,
       'amount': round2(amount),
       'note': (note?.trim().isEmpty ?? true) ? null : note!.trim(),
@@ -851,28 +929,23 @@ class LocalApi {
     final rows = monthKeyFilter == null
         ? await db.query('expenses', orderBy: 'createdAtMs DESC', limit: 300)
         : await db.query(
-            'expenses',
-            where: 'monthKey = ?',
-            whereArgs: [monthKeyFilter],
-            orderBy: 'createdAtMs DESC',
-            limit: 300,
-          );
+      'expenses',
+      where: 'monthKey = ?',
+      whereArgs: [monthKeyFilter],
+      orderBy: 'createdAtMs DESC',
+      limit: 300,
+    );
     return rows.map(ExpenseDoc.fromRow).toList();
   }
 
-  /* ---------------- ADMIN / STATS ---------------- */
+  // ================= ADMIN / STATS =================
 
   Future<List<String>> getMonthOptions() async {
     final db = await _open();
-    final rows1 = await db.rawQuery(
-      'SELECT DISTINCT monthKey FROM sales ORDER BY monthKey DESC',
-    );
-    final rows2 = await db.rawQuery(
-      'SELECT DISTINCT monthKey FROM investments ORDER BY monthKey DESC',
-    );
-    final rows3 = await db.rawQuery(
-      'SELECT DISTINCT monthKey FROM expenses ORDER BY monthKey DESC',
-    );
+
+    final rows1 = await db.rawQuery('SELECT DISTINCT monthKey FROM sales ORDER BY monthKey DESC');
+    final rows2 = await db.rawQuery('SELECT DISTINCT monthKey FROM investments ORDER BY monthKey DESC');
+    final rows3 = await db.rawQuery('SELECT DISTINCT monthKey FROM expenses ORDER BY monthKey DESC');
 
     final set = <String>{};
     set.add(monthKey(DateTime.now()));
@@ -898,10 +971,10 @@ class LocalApi {
     final db = await _open();
     final todayK = dayKey(DateTime.now());
 
-    // ✅ SALES: mos i numro reverted
+    // SALES (no reverted)
     final sAll = await db.rawQuery(
       'SELECT COUNT(*) c, COALESCE(SUM(total),0) ts, COALESCE(SUM(profitTotal),0) tp '
-      'FROM sales WHERE revertedAtMs IS NULL',
+          'FROM sales WHERE revertedAtMs IS NULL',
     );
     final countAll = (sAll.first['c'] as int?) ?? 0;
     final totalSalesAll = ((sAll.first['ts'] as num?) ?? 0).toDouble();
@@ -909,7 +982,7 @@ class LocalApi {
 
     final sM = await db.rawQuery(
       'SELECT COUNT(*) c, COALESCE(SUM(total),0) ts, COALESCE(SUM(profitTotal),0) tp '
-      'FROM sales WHERE monthKey = ? AND revertedAtMs IS NULL',
+          'FROM sales WHERE monthKey = ? AND revertedAtMs IS NULL',
       [selectedMonth],
     );
     final countMonth = (sM.first['c'] as int?) ?? 0;
@@ -918,14 +991,14 @@ class LocalApi {
 
     final sT = await db.rawQuery(
       'SELECT COUNT(*) c, COALESCE(SUM(total),0) ts, COALESCE(SUM(profitTotal),0) tp '
-      'FROM sales WHERE dayKey = ? AND revertedAtMs IS NULL',
+          'FROM sales WHERE dayKey = ? AND revertedAtMs IS NULL',
       [todayK],
     );
     final countToday = (sT.first['c'] as int?) ?? 0;
     final totalSalesToday = ((sT.first['ts'] as num?) ?? 0).toDouble();
     final totalProfitToday = ((sT.first['tp'] as num?) ?? 0).toDouble();
 
-    // ✅ INVEST: mos i numro reverted
+    // INVEST (no reverted)
     final iAll = await db.rawQuery(
       'SELECT COALESCE(SUM(amount),0) s FROM investments WHERE revertedAtMs IS NULL',
     );
@@ -943,7 +1016,7 @@ class LocalApi {
     );
     final totalInvestToday = ((iT.first['s'] as num?) ?? 0).toDouble();
 
-    // ✅ EXPENSE: mos i numro reverted
+    // EXPENSE (no reverted)
     final eAll = await db.rawQuery(
       'SELECT COALESCE(SUM(amount),0) s FROM expenses WHERE revertedAtMs IS NULL',
     );
@@ -962,10 +1035,7 @@ class LocalApi {
     final totalExpensesToday = ((eT.first['s'] as num?) ?? 0).toDouble();
 
     // STOCK totals + value final
-    final pRows = await db.query(
-      'products',
-      columns: ['stockQty', 'price', 'discountPercent'],
-    );
+    final pRows = await db.query('products', columns: ['stockQty', 'price', 'discountPercent']);
     int totalStock = 0;
     double totalValueFinal = 0;
     for (final r in pRows) {
@@ -984,25 +1054,22 @@ class LocalApi {
       countSalesAll: countAll,
       totalInvestAll: round2(totalInvestAll),
       totalExpensesAll: round2(totalExpensesAll),
-
       totalSalesMonth: round2(totalSalesMonth),
       totalProfitMonth: round2(totalProfitMonth),
       countSalesMonth: countMonth,
       totalInvestMonth: round2(totalInvestMonth),
       totalExpensesMonth: round2(totalExpensesMonth),
-
       totalSalesToday: round2(totalSalesToday),
       totalProfitToday: round2(totalProfitToday),
       countSalesToday: countToday,
       totalInvestToday: round2(totalInvestToday),
       totalExpensesToday: round2(totalExpensesToday),
-
       totalStock: totalStock,
       totalStockValueFinal: round2(totalValueFinal),
     );
   }
 
-  /// ✅ Activity me ID + reverted
+  /// ✅ Pse limit 60? veç për UI mos me u rëndu (mundesh me ndrru kur dush)
   Future<List<ActivityItem>> getActivity({int limit = 60}) async {
     final db = await _open();
 
@@ -1054,7 +1121,7 @@ class LocalApi {
           createdAtMs: ms,
           title: reverted ? 'SHITJE (REVERT)' : 'SHITJE',
           sub:
-              'Total: €${total.toStringAsFixed(2)} • Fitim: €${profit.toStringAsFixed(2)}${invNo.isEmpty ? '' : ' • $invNo'}',
+          'Total: €${total.toStringAsFixed(2)} • Fitim: €${profit.toStringAsFixed(2)}${invNo.isEmpty ? '' : ' • $invNo'}',
           amount: total,
         ),
       );
@@ -1095,8 +1162,7 @@ class LocalApi {
           reverted: reverted,
           createdAtMs: ms,
           title: reverted ? 'SHPENZIM (REVERT)' : 'SHPENZIM',
-          sub:
-              '${cat.trim().isEmpty ? 'Tjera' : cat}${note.isEmpty ? '' : ' • $note'}',
+          sub: '${cat.trim().isEmpty ? 'Tjera' : cat}${note.isEmpty ? '' : ' • $note'}',
           amount: amount,
         ),
       );
@@ -1104,5 +1170,47 @@ class LocalApi {
 
     items.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
     return items.take(limit).toList();
+  }
+
+  /// ✅ Year stats (që t’ka dal getYearStats missing)
+  Future<YearStats> getYearStats(int year) async {
+    final db = await _open();
+    final yPrefix = '$year-';
+
+    final s = await db.rawQuery(
+      '''
+      SELECT COUNT(*) c, COALESCE(SUM(total),0) ts, COALESCE(SUM(profitTotal),0) tp
+      FROM sales
+      WHERE dayKey LIKE ? AND revertedAtMs IS NULL
+      ''',
+      ['$yPrefix%'],
+    );
+
+    final inv = await db.rawQuery(
+      '''
+      SELECT COALESCE(SUM(amount),0) s
+      FROM investments
+      WHERE dayKey LIKE ? AND revertedAtMs IS NULL
+      ''',
+      ['$yPrefix%'],
+    );
+
+    final exp = await db.rawQuery(
+      '''
+      SELECT COALESCE(SUM(amount),0) s
+      FROM expenses
+      WHERE dayKey LIKE ? AND revertedAtMs IS NULL
+      ''',
+      ['$yPrefix%'],
+    );
+
+    return YearStats(
+      year: year,
+      sales: round2(((s.first['ts'] as num?) ?? 0).toDouble()),
+      profit: round2(((s.first['tp'] as num?) ?? 0).toDouble()),
+      investments: round2(((inv.first['s'] as num?) ?? 0).toDouble()),
+      expenses: round2(((exp.first['s'] as num?) ?? 0).toDouble()),
+      countSales: (s.first['c'] as int?) ?? 0,
+    );
   }
 }

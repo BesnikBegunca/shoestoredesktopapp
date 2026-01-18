@@ -1,4 +1,5 @@
 import 'receipt_preview.dart';
+import '../src/local/local_api.dart';
 
 // ✅ labels për TESHA (key 1000..)
 const List<String> _clothLabels = [
@@ -65,7 +66,9 @@ List<ReceiptLine> buildReceiptLines({
 
   if (hasDiscount) {
     lines.add(ReceiptLine('Cmimi origjinal', money(unitPriceOriginal)));
-    lines.add(ReceiptLine('Zbritja', '-${discountPercent.toStringAsFixed(0)}%'));
+    lines.add(
+      ReceiptLine('Zbritja', '-${discountPercent.toStringAsFixed(0)}%'),
+    );
     lines.add(ReceiptLine('Cmimi final', money(unitPriceFinal), bold: true));
   } else {
     lines.add(ReceiptLine('Cmimi', money(unitPriceFinal), bold: true));
@@ -74,6 +77,44 @@ List<ReceiptLine> buildReceiptLines({
   lines.add(const ReceiptLine('----------------', ''));
 
   lines.add(ReceiptLine('TOTAL', money(totalFinal), bold: true));
+
+  return lines;
+}
+
+List<ReceiptLine> buildReceiptLinesForCart({
+  required String invoiceNo,
+  required DateTime date,
+  required List<CartItem> cartItems,
+}) {
+  String pad2(int n) => n.toString().padLeft(2, '0');
+  String dateStr =
+      '${pad2(date.day)}.${pad2(date.month)}.${date.year} ${pad2(date.hour)}:${pad2(date.minute)}';
+
+  String money(double v) => '€${v.toStringAsFixed(2)}';
+
+  final lines = <ReceiptLine>[];
+
+  lines.add(ReceiptLine('FATURA', invoiceNo, bold: true));
+  lines.add(ReceiptLine('Data', dateStr));
+
+  lines.add(const ReceiptLine('----------------', ''));
+
+  // Items
+  lines.add(const ReceiptLine('Artikujt', '', bold: true));
+
+  double total = 0;
+  for (final item in cartItems) {
+    final sizeLabel = _labelForSizeKey(item.size);
+    lines.add(
+      ReceiptLine(item.product.name, 'x${item.quantity} (${sizeLabel})'),
+    );
+    lines.add(ReceiptLine('', money(item.lineTotal)));
+    total += item.lineTotal;
+  }
+
+  lines.add(const ReceiptLine('----------------', ''));
+
+  lines.add(ReceiptLine('TOTAL', money(total), bold: true));
 
   return lines;
 }

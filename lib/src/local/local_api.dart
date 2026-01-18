@@ -118,7 +118,11 @@ double calcFinalPrice({
   required double discountPercent,
 }) {
   final p0 = price.isFinite ? price : 0;
-  final d0 = clampDouble(discountPercent.isFinite ? discountPercent : 0, 0, 100);
+  final d0 = clampDouble(
+    discountPercent.isFinite ? discountPercent : 0,
+    0,
+    100,
+  );
   return round2(p0 * (1 - d0 / 100));
 }
 
@@ -364,6 +368,19 @@ class SellResult {
   });
 }
 
+class CartItem {
+  final Product product;
+  final int size;
+  int quantity;
+
+  CartItem({required this.product, required this.size, this.quantity = 1});
+
+  double get unitPrice => product.finalPrice;
+  double get lineTotal => unitPrice * quantity;
+  double get lineProfit =>
+      (unitPrice - (product.purchasePrice ?? 0)) * quantity;
+}
+
 /// ✅ NEW: Stats per punëtor
 class WorkerStats {
   final int countSales;
@@ -395,10 +412,10 @@ class LocalApi {
   }
 
   Future<void> _tryAddColumn(
-      Database d, {
-        required String table,
-        required String columnSql,
-      }) async {
+    Database d, {
+    required String table,
+    required String columnSql,
+  }) async {
     try {
       await d.execute('ALTER TABLE $table ADD COLUMN $columnSql');
     } catch (_) {}
@@ -430,13 +447,37 @@ class LocalApi {
         await d.execute(kSqlCreateExpenses);
 
         // columns for old dbs
-        await _tryAddColumn(d, table: 'products', columnSql: 'sizeStockJson TEXT');
-        await _tryAddColumn(d, table: 'sale_items', columnSql: 'shoeSize INTEGER');
+        await _tryAddColumn(
+          d,
+          table: 'products',
+          columnSql: 'sizeStockJson TEXT',
+        );
+        await _tryAddColumn(
+          d,
+          table: 'sale_items',
+          columnSql: 'shoeSize INTEGER',
+        );
 
-        await _tryAddColumn(d, table: 'sales', columnSql: 'revertedAtMs INTEGER');
-        await _tryAddColumn(d, table: 'sales', columnSql: 'userId INTEGER'); // ✅ NEW
-        await _tryAddColumn(d, table: 'investments', columnSql: 'revertedAtMs INTEGER');
-        await _tryAddColumn(d, table: 'expenses', columnSql: 'revertedAtMs INTEGER');
+        await _tryAddColumn(
+          d,
+          table: 'sales',
+          columnSql: 'revertedAtMs INTEGER',
+        );
+        await _tryAddColumn(
+          d,
+          table: 'sales',
+          columnSql: 'userId INTEGER',
+        ); // ✅ NEW
+        await _tryAddColumn(
+          d,
+          table: 'investments',
+          columnSql: 'revertedAtMs INTEGER',
+        );
+        await _tryAddColumn(
+          d,
+          table: 'expenses',
+          columnSql: 'revertedAtMs INTEGER',
+        );
         await _tryAddColumn(d, table: 'expenses', columnSql: 'userId INTEGER');
       },
       onOpen: (d) async {
@@ -447,13 +488,37 @@ class LocalApi {
         await d.execute(kSqlCreateInvestments);
         await d.execute(kSqlCreateExpenses);
 
-        await _tryAddColumn(d, table: 'products', columnSql: 'sizeStockJson TEXT');
-        await _tryAddColumn(d, table: 'sale_items', columnSql: 'shoeSize INTEGER');
+        await _tryAddColumn(
+          d,
+          table: 'products',
+          columnSql: 'sizeStockJson TEXT',
+        );
+        await _tryAddColumn(
+          d,
+          table: 'sale_items',
+          columnSql: 'shoeSize INTEGER',
+        );
 
-        await _tryAddColumn(d, table: 'sales', columnSql: 'revertedAtMs INTEGER');
-        await _tryAddColumn(d, table: 'sales', columnSql: 'userId INTEGER'); // ✅ NEW
-        await _tryAddColumn(d, table: 'investments', columnSql: 'revertedAtMs INTEGER');
-        await _tryAddColumn(d, table: 'expenses', columnSql: 'revertedAtMs INTEGER');
+        await _tryAddColumn(
+          d,
+          table: 'sales',
+          columnSql: 'revertedAtMs INTEGER',
+        );
+        await _tryAddColumn(
+          d,
+          table: 'sales',
+          columnSql: 'userId INTEGER',
+        ); // ✅ NEW
+        await _tryAddColumn(
+          d,
+          table: 'investments',
+          columnSql: 'revertedAtMs INTEGER',
+        );
+        await _tryAddColumn(
+          d,
+          table: 'expenses',
+          columnSql: 'revertedAtMs INTEGER',
+        );
         await _tryAddColumn(d, table: 'expenses', columnSql: 'userId INTEGER');
       },
     );
@@ -474,7 +539,9 @@ class LocalApi {
   /// username: admin , password: 1234
   Future<void> ensureDefaultAdmin() async {
     final db = await _open();
-    final rows = await db.rawQuery("SELECT id FROM users WHERE role='admin' LIMIT 1");
+    final rows = await db.rawQuery(
+      "SELECT id FROM users WHERE role='admin' LIMIT 1",
+    );
     if (rows.isNotEmpty) return;
 
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -601,14 +668,21 @@ class LocalApi {
 
   Future<AppUser?> getUserById(int userId) async {
     final db = await _open();
-    final rows = await db.query('users', where: 'id = ?', whereArgs: [userId], limit: 1);
+    final rows = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
     if (rows.isEmpty) return null;
     return AppUser.fromRow(rows.first);
   }
 
   // ================= PRODUCTS =================
 
-  Future<List<Product>> getProducts({String orderBy = 'createdAtMs DESC'}) async {
+  Future<List<Product>> getProducts({
+    String orderBy = 'createdAtMs DESC',
+  }) async {
     final db = await _open();
     final rows = await db.query('products', orderBy: orderBy);
     return rows.map(Product.fromRow).toList();
@@ -632,7 +706,9 @@ class LocalApi {
     final map = {
       'name': name.trim(),
       'sku': (sku?.trim().isEmpty ?? true) ? null : sku!.trim(),
-      'serialNumber': (serialNumber?.trim().isEmpty ?? true) ? null : serialNumber!.trim(),
+      'serialNumber': (serialNumber?.trim().isEmpty ?? true)
+          ? null
+          : serialNumber!.trim(),
       'price': round2(price),
       'purchasePrice': purchasePrice == null ? null : round2(purchasePrice),
       'stockQty': total,
@@ -666,7 +742,9 @@ class LocalApi {
     final map = {
       'name': name.trim(),
       'sku': (sku?.trim().isEmpty ?? true) ? null : sku!.trim(),
-      'serialNumber': (serialNumber?.trim().isEmpty ?? true) ? null : serialNumber!.trim(),
+      'serialNumber': (serialNumber?.trim().isEmpty ?? true)
+          ? null
+          : serialNumber!.trim(),
       'price': round2(price),
       'purchasePrice': purchasePrice == null ? null : round2(purchasePrice),
       'stockQty': total,
@@ -797,6 +875,116 @@ class LocalApi {
     });
   }
 
+  // ================= SELL (multiple items from cart) =================
+
+  /// ✅ Sell multiple items from cart
+  Future<SellResult> sellMany({
+    required List<CartItem> cartItems,
+    required int userId,
+  }) async {
+    if (cartItems.isEmpty) throw Exception('Cart is empty.');
+
+    final db = await _open();
+    final now = DateTime.now();
+    final nowMs = now.millisecondsSinceEpoch;
+
+    return db.transaction((tx) async {
+      double total = 0;
+      double totalProfit = 0;
+
+      // Validate stock and calculate totals
+      for (final item in cartItems) {
+        final prodRows = await tx.query(
+          'products',
+          where: 'id = ?',
+          whereArgs: [item.product.id],
+          limit: 1,
+        );
+        if (prodRows.isEmpty)
+          throw Exception('Produkti nuk ekziston: ${item.product.name}');
+
+        final p0 = Product.fromRow(prodRows.first);
+        if (!p0.active)
+          throw Exception('Ky produkt është OFF: ${item.product.name}');
+
+        final map = Map<int, int>.from(p0.sizeStock);
+        final q = map[item.size] ?? 0;
+        if (q < item.quantity)
+          throw Exception(
+            'S’ka stok për numrin ${item.size} (${item.product.name}).',
+          );
+
+        total += item.lineTotal;
+        totalProfit += item.lineProfit;
+      }
+
+      // Update stock for each item
+      for (final item in cartItems) {
+        final prodRows = await tx.query(
+          'products',
+          where: 'id = ?',
+          whereArgs: [item.product.id],
+          limit: 1,
+        );
+        final p0 = Product.fromRow(prodRows.first);
+        final map = Map<int, int>.from(p0.sizeStock);
+        map[item.size] = (map[item.size] ?? 0) - item.quantity;
+        final newTotal = _totalStock(map);
+
+        await tx.update(
+          'products',
+          {
+            'sizeStockJson': _encodeSizeStock(map),
+            'stockQty': newTotal,
+            'updatedAtMs': nowMs,
+          },
+          where: 'id = ?',
+          whereArgs: [item.product.id],
+        );
+      }
+
+      total = round2(total);
+      totalProfit = round2(totalProfit);
+
+      final invNo = 'INV-$nowMs';
+      final saleId = await tx.insert('sales', {
+        'invoiceNo': invNo,
+        'userId': userId,
+        'total': total,
+        'profitTotal': totalProfit,
+        'dayKey': dayKey(now),
+        'monthKey': monthKey(now),
+        'createdAtMs': nowMs,
+        'revertedAtMs': null,
+      });
+
+      // Insert sale items
+      for (final item in cartItems) {
+        await tx.insert('sale_items', {
+          'saleId': saleId,
+          'productId': item.product.id,
+          'name': item.product.name,
+          'sku': item.product.sku,
+          'serialNumber': item.product.serialNumber,
+          'qty': item.quantity,
+          'unitPrice': item.unitPrice,
+          'unitPurchasePrice': item.product.purchasePrice ?? 0,
+          'discountPercent': item.product.discountPercent,
+          'lineTotal': item.lineTotal,
+          'lineProfit': item.lineProfit,
+          'shoeSize': item.size,
+        });
+      }
+
+      return SellResult(
+        saleId: saleId,
+        invoiceNo: invNo,
+        total: total,
+        profit: totalProfit,
+      );
+    });
+  }
+
   // ================= REVERT =================
 
   Future<void> revertSale({required int saleId}) async {
@@ -804,15 +992,30 @@ class LocalApi {
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
     await db.transaction((tx) async {
-      final saleRows = await tx.query('sales', where: 'id = ?', whereArgs: [saleId], limit: 1);
+      final saleRows = await tx.query(
+        'sales',
+        where: 'id = ?',
+        whereArgs: [saleId],
+        limit: 1,
+      );
       if (saleRows.isEmpty) throw Exception('Shitja nuk ekziston.');
 
       final revertedAt = saleRows.first['revertedAtMs'] as int?;
-      if (revertedAt != null) throw Exception('Kjo shitje veç është revert-uar.');
+      if (revertedAt != null)
+        throw Exception('Kjo shitje veç është revert-uar.');
 
-      final items = await tx.query('sale_items', where: 'saleId = ?', whereArgs: [saleId]);
+      final items = await tx.query(
+        'sale_items',
+        where: 'saleId = ?',
+        whereArgs: [saleId],
+      );
       if (items.isEmpty) {
-        await tx.update('sales', {'revertedAtMs': nowMs}, where: 'id = ?', whereArgs: [saleId]);
+        await tx.update(
+          'sales',
+          {'revertedAtMs': nowMs},
+          where: 'id = ?',
+          whereArgs: [saleId],
+        );
         return;
       }
 
@@ -821,7 +1024,12 @@ class LocalApi {
         final qty = (it['qty'] as int?) ?? 1;
         final shoeSize = it['shoeSize'] as int?;
 
-        final prodRows = await tx.query('products', where: 'id = ?', whereArgs: [productId], limit: 1);
+        final prodRows = await tx.query(
+          'products',
+          where: 'id = ?',
+          whereArgs: [productId],
+          limit: 1,
+        );
         if (prodRows.isEmpty) continue;
 
         final p0 = Product.fromRow(prodRows.first);
@@ -851,7 +1059,12 @@ class LocalApi {
         }
       }
 
-      await tx.update('sales', {'revertedAtMs': nowMs}, where: 'id = ?', whereArgs: [saleId]);
+      await tx.update(
+        'sales',
+        {'revertedAtMs': nowMs},
+        where: 'id = ?',
+        whereArgs: [saleId],
+      );
     });
   }
 
@@ -859,22 +1072,44 @@ class LocalApi {
     final db = await _open();
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-    final rows = await db.query('investments', where: 'id = ?', whereArgs: [investId], limit: 1);
+    final rows = await db.query(
+      'investments',
+      where: 'id = ?',
+      whereArgs: [investId],
+      limit: 1,
+    );
     if (rows.isEmpty) throw Exception('Investimi nuk ekziston.');
-    if (rows.first['revertedAtMs'] != null) throw Exception('Ky investim veç është revert-uar.');
+    if (rows.first['revertedAtMs'] != null)
+      throw Exception('Ky investim veç është revert-uar.');
 
-    await db.update('investments', {'revertedAtMs': nowMs}, where: 'id = ?', whereArgs: [investId]);
+    await db.update(
+      'investments',
+      {'revertedAtMs': nowMs},
+      where: 'id = ?',
+      whereArgs: [investId],
+    );
   }
 
   Future<void> revertExpense({required int expenseId}) async {
     final db = await _open();
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-    final rows = await db.query('expenses', where: 'id = ?', whereArgs: [expenseId], limit: 1);
+    final rows = await db.query(
+      'expenses',
+      where: 'id = ?',
+      whereArgs: [expenseId],
+      limit: 1,
+    );
     if (rows.isEmpty) throw Exception('Shpenzimi nuk ekziston.');
-    if (rows.first['revertedAtMs'] != null) throw Exception('Ky shpenzim veç është revert-uar.');
+    if (rows.first['revertedAtMs'] != null)
+      throw Exception('Ky shpenzim veç është revert-uar.');
 
-    await db.update('expenses', {'revertedAtMs': nowMs}, where: 'id = ?', whereArgs: [expenseId]);
+    await db.update(
+      'expenses',
+      {'revertedAtMs': nowMs},
+      where: 'id = ?',
+      whereArgs: [expenseId],
+    );
   }
 
   // ================= INVESTMENTS =================
@@ -896,7 +1131,9 @@ class LocalApi {
     });
   }
 
-  Future<List<Map<String, Object?>>> getInvestments({String? monthKeyFilter}) async {
+  Future<List<Map<String, Object?>>> getInvestments({
+    String? monthKeyFilter,
+  }) async {
     final db = await _open();
     if (monthKeyFilter == null) {
       return db.query('investments', orderBy: 'createdAtMs DESC', limit: 200);
@@ -943,12 +1180,12 @@ class LocalApi {
     final rows = monthKeyFilter == null
         ? await db.query('expenses', orderBy: 'createdAtMs DESC', limit: 300)
         : await db.query(
-      'expenses',
-      where: 'monthKey = ?',
-      whereArgs: [monthKeyFilter],
-      orderBy: 'createdAtMs DESC',
-      limit: 300,
-    );
+            'expenses',
+            where: 'monthKey = ?',
+            whereArgs: [monthKeyFilter],
+            orderBy: 'createdAtMs DESC',
+            limit: 300,
+          );
     return rows.map(ExpenseDoc.fromRow).toList();
   }
 
@@ -957,9 +1194,15 @@ class LocalApi {
   Future<List<String>> getMonthOptions() async {
     final db = await _open();
 
-    final rows1 = await db.rawQuery('SELECT DISTINCT monthKey FROM sales ORDER BY monthKey DESC');
-    final rows2 = await db.rawQuery('SELECT DISTINCT monthKey FROM investments ORDER BY monthKey DESC');
-    final rows3 = await db.rawQuery('SELECT DISTINCT monthKey FROM expenses ORDER BY monthKey DESC');
+    final rows1 = await db.rawQuery(
+      'SELECT DISTINCT monthKey FROM sales ORDER BY monthKey DESC',
+    );
+    final rows2 = await db.rawQuery(
+      'SELECT DISTINCT monthKey FROM investments ORDER BY monthKey DESC',
+    );
+    final rows3 = await db.rawQuery(
+      'SELECT DISTINCT monthKey FROM expenses ORDER BY monthKey DESC',
+    );
 
     final set = <String>{};
     set.add(monthKey(DateTime.now()));
@@ -988,7 +1231,7 @@ class LocalApi {
     // SALES (no reverted)
     final sAll = await db.rawQuery(
       'SELECT COUNT(*) c, COALESCE(SUM(total),0) ts, COALESCE(SUM(profitTotal),0) tp '
-          'FROM sales WHERE revertedAtMs IS NULL',
+      'FROM sales WHERE revertedAtMs IS NULL',
     );
     final countAll = (sAll.first['c'] as int?) ?? 0;
     final totalSalesAll = ((sAll.first['ts'] as num?) ?? 0).toDouble();
@@ -996,7 +1239,7 @@ class LocalApi {
 
     final sM = await db.rawQuery(
       'SELECT COUNT(*) c, COALESCE(SUM(total),0) ts, COALESCE(SUM(profitTotal),0) tp '
-          'FROM sales WHERE monthKey = ? AND revertedAtMs IS NULL',
+      'FROM sales WHERE monthKey = ? AND revertedAtMs IS NULL',
       [selectedMonth],
     );
     final countMonth = (sM.first['c'] as int?) ?? 0;
@@ -1005,7 +1248,7 @@ class LocalApi {
 
     final sT = await db.rawQuery(
       'SELECT COUNT(*) c, COALESCE(SUM(total),0) ts, COALESCE(SUM(profitTotal),0) tp '
-          'FROM sales WHERE dayKey = ? AND revertedAtMs IS NULL',
+      'FROM sales WHERE dayKey = ? AND revertedAtMs IS NULL',
       [todayK],
     );
     final countToday = (sT.first['c'] as int?) ?? 0;
@@ -1049,7 +1292,10 @@ class LocalApi {
     final totalExpensesToday = ((eT.first['s'] as num?) ?? 0).toDouble();
 
     // STOCK totals + value final
-    final pRows = await db.query('products', columns: ['stockQty', 'price', 'discountPercent']);
+    final pRows = await db.query(
+      'products',
+      columns: ['stockQty', 'price', 'discountPercent'],
+    );
     int totalStock = 0;
     double totalValueFinal = 0;
     for (final r in pRows) {
@@ -1134,7 +1380,7 @@ class LocalApi {
           createdAtMs: ms,
           title: reverted ? 'SHITJE (REVERT)' : 'SHITJE',
           sub:
-          'Total: €${total.toStringAsFixed(2)} • Fitim: €${profit.toStringAsFixed(2)}${invNo.isEmpty ? '' : ' • $invNo'}',
+              'Total: €${total.toStringAsFixed(2)} • Fitim: €${profit.toStringAsFixed(2)}${invNo.isEmpty ? '' : ' • $invNo'}',
           amount: total,
         ),
       );
@@ -1175,7 +1421,8 @@ class LocalApi {
           reverted: reverted,
           createdAtMs: ms,
           title: reverted ? 'SHPENZIM (REVERT)' : 'SHPENZIM',
-          sub: '${cat.trim().isEmpty ? 'Tjera' : cat}${note.isEmpty ? '' : ' • $note'}',
+          sub:
+              '${cat.trim().isEmpty ? 'Tjera' : cat}${note.isEmpty ? '' : ' • $note'}',
           amount: amount,
         ),
       );
@@ -1237,10 +1484,7 @@ class LocalApi {
   }) async {
     final db = await _open();
 
-    final where = <String>[
-      'revertedAtMs IS NULL',
-      'userId = ?',
-    ];
+    final where = <String>['revertedAtMs IS NULL', 'userId = ?'];
     final args = <Object?>[userId];
 
     if (scope == 'day') {

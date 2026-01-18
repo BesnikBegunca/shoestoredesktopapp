@@ -11,6 +11,14 @@ import 'package:shoe_store_manager/src/screens/login_screen.dart';
 import '../local/local_api.dart';
 import '../theme/app_theme.dart';
 
+/// Cart Item for display
+class CartDisplayItem {
+  final CartItem cartItem;
+  final int index;
+
+  CartDisplayItem(this.cartItem, this.index);
+}
+
 /// ✅ SIZE LABEL FORMATTER (same logic as ProductScreen)
 String formatSizeLabel(int size) {
   switch (size) {
@@ -55,6 +63,10 @@ class _MainScreenState extends State<MainScreen> {
   bool loading = false;
   String lastQuery = '';
   List<Product> results = [];
+
+  // Cart functionality
+  List<CartItem> cart = [];
+  bool checkingOut = false;
 
   @override
   void initState() {
@@ -114,8 +126,9 @@ class _MainScreenState extends State<MainScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gabim: $e')));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -147,8 +160,9 @@ class _MainScreenState extends State<MainScreen> {
       setState(() => results = list);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gabim: $e')));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -163,6 +177,18 @@ class _MainScreenState extends State<MainScreen> {
         onSold: () async {
           await _search(qC.text);
         },
+        onAddToCart: (product, size) {
+          // Check if item already in cart
+          final existingIndex = cart.indexWhere(
+            (item) => item.product.id == product.id && item.size == size,
+          );
+          if (existingIndex >= 0) {
+            setState(() => cart[existingIndex].quantity++);
+          } else {
+            setState(() => cart.add(CartItem(product: product, size: size)));
+          }
+          Navigator.pop(context); // Close dialog
+        },
       ),
     );
   }
@@ -173,6 +199,15 @@ class _MainScreenState extends State<MainScreen> {
       appBar: AppBar(
         title: const Text('Shitja'),
         actions: [
+          if (cart.isNotEmpty)
+            IconButton(
+              tooltip: 'Shporta (${cart.length})',
+              onPressed: _showCartDialog,
+              icon: Badge(
+                label: Text(cart.length.toString()),
+                child: const Icon(Icons.shopping_cart),
+              ),
+            ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: () => _search(qC.text),
@@ -187,7 +222,7 @@ class _MainScreenState extends State<MainScreen> {
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    (_) => false,
+                (_) => false,
               );
             },
           ),
@@ -206,17 +241,17 @@ class _MainScreenState extends State<MainScreen> {
                   : results.isEmpty
                   ? const Center(child: Text('S’ka rezultate.'))
                   : GridView.builder(
-                padding: const EdgeInsets.only(bottom: 12),
-                gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.9,
-                ),
-                itemCount: results.length,
-                itemBuilder: (_, i) => _productCard(results[i]),
-              ),
+                      padding: const EdgeInsets.only(bottom: 12),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 4,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.9,
+                          ),
+                      itemCount: results.length,
+                      itemBuilder: (_, i) => _productCard(results[i]),
+                    ),
             ),
           ],
         ),
@@ -412,6 +447,314 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
+
+  void _showCartDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => _CartDialog(
+        cart: cart,
+        onCheckout: _checkoutCart,
+        onRemoveItem: (index) {
+          setState(() => cart.removeAt(index));
+        },
+        onUpdateQuantity: (index, qty) {
+          if (qty <= 0) {
+            setState(() => cart.removeAt(index));
+          } else {
+            setState(() => cart[index].quantity = qty);
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _checkoutCart() async {
+    if (cart.isEmpty) return;
+
+    setState(() => checkingOut = true);
+    try {
+      final uid = await RoleStore.getUserId();
+      if (uid <= 0) {
+        throw Exception('UserId s\'osht i logum (uid=$uid). Bëj logout/login.');
+      }
+
+      final res = await LocalApi.I.sellMany(cartItems: cart, userId: uid);
+
+      // Clear cart
+      setState(() => cart.clear());
+
+      // Refresh products
+      await _search(qC.text);
+
+      if (!mounted) return;
+
+      // Show success dialog
+      showDialog(
+        context: context,
+        builder: (_) => _CheckoutSuccessDialog(
+          invoiceNo: res.invoiceNo,
+          total: res.total,
+          cartItems: cart,
+          onPrint: () async {
+            final lines = buildReceiptLinesForCart(
+              invoiceNo: res.invoiceNo,
+              date: DateTime.now(),
+              cartItems: cart,
+            );
+
+            await ReceiptPdf80mm.printOrSave(
+              title: 'SHOESTORE',
+              lines: lines,
+              jobName: res.invoiceNo,
+            );
+          },
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gabim gjatë checkout: $e')));
+    } finally {
+      if (mounted) setState(() => checkingOut = false);
+    }
+  }
+}
+
+/// ================= CART DIALOG =================
+
+class _CartDialog extends StatefulWidget {
+  final List<CartItem> cart;
+  final VoidCallback onCheckout;
+  final Function(int) onRemoveItem;
+  final Function(int, int) onUpdateQuantity;
+
+  const _CartDialog({
+    required this.cart,
+    required this.onCheckout,
+    required this.onRemoveItem,
+    required this.onUpdateQuantity,
+  });
+
+  @override
+  State<_CartDialog> createState() => _CartDialogState();
+}
+
+class _CartDialogState extends State<_CartDialog> {
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.cart.fold<double>(
+      0,
+      (sum, item) => sum + item.lineTotal,
+    );
+
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 800),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    'Shporta',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (widget.cart.isEmpty)
+                const Text('Shporta është bosh.')
+              else
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: widget.cart.length,
+                    itemBuilder: (context, index) {
+                      final item = widget.cart[index];
+                      return Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.product.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Numri: ${formatSizeLabel(item.size)}',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Çmimi: €${item.unitPrice.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    onPressed: item.quantity > 1
+                                        ? () => widget.onUpdateQuantity(
+                                            index,
+                                            item.quantity - 1,
+                                          )
+                                        : null,
+                                    icon: const Icon(Icons.remove),
+                                  ),
+                                  Text(
+                                    '${item.quantity}',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () => widget.onUpdateQuantity(
+                                      index,
+                                      item.quantity + 1,
+                                    ),
+                                    icon: const Icon(Icons.add),
+                                  ),
+                                ],
+                              ),
+                              IconButton(
+                                onPressed: () => widget.onRemoveItem(index),
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              const Divider(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Total: €${total.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  FilledButton.icon(
+                    onPressed: widget.cart.isNotEmpty
+                        ? widget.onCheckout
+                        : null,
+                    icon: const Icon(Icons.payment),
+                    label: const Text('Checkout'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// ================= CHECKOUT SUCCESS DIALOG =================
+
+class _CheckoutSuccessDialog extends StatelessWidget {
+  final String invoiceNo;
+  final double total;
+  final List<CartItem> cartItems;
+  final VoidCallback onPrint;
+
+  const _CheckoutSuccessDialog({
+    required this.invoiceNo,
+    required this.total,
+    required this.cartItems,
+    required this.onPrint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.green.withOpacity(0.12),
+                border: Border.all(color: Colors.green.withOpacity(0.35)),
+              ),
+              child: const Icon(
+                Icons.check_circle,
+                size: 46,
+                color: Colors.green,
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Shitja u krye me sukses ✅',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Invoice: $invoiceNo',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              'Total: €${total.toStringAsFixed(2)}',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () {
+                onPrint();
+                Navigator.pop(context);
+              },
+              icon: const Icon(Icons.print),
+              label: const Text('Printo Faturen'),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Mbyll'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// ================= POPUP DIALOG =================
@@ -419,8 +762,13 @@ class _MainScreenState extends State<MainScreen> {
 class _ProductDialog extends StatefulWidget {
   final Product product;
   final Future<void> Function() onSold;
+  final Function(Product, int) onAddToCart;
 
-  const _ProductDialog({required this.product, required this.onSold});
+  const _ProductDialog({
+    required this.product,
+    required this.onSold,
+    required this.onAddToCart,
+  });
 
   @override
   State<_ProductDialog> createState() => _ProductDialogState();
@@ -459,214 +807,246 @@ class _ProductDialogState extends State<_ProductDialog> {
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 620),
+        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 800),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             child: sold
                 ? _successView()
-                : Column(
-              key: const ValueKey('details'),
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        p.name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed:
-                      selling ? null : () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                _metaRow('Serial', p.serialNumber ?? '—'),
-                _metaRow('SKU', p.sku ?? '—'),
-                _metaRow('Status', p.active ? 'Active' : 'OFF'),
-                _metaRow('Total', '${p.stockQty}'),
-                const SizedBox(height: 12),
-                const Text(
-                  'Numrat / Stoku',
-                  style: TextStyle(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 8),
-
-                if (sizes.isEmpty)
-                  Text(
-                    'S’ka numra të regjistrum.',
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  )
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final s in sizes)
-                        _sizeSelectChip(
-                          size: s,
-                          qty: p.qtyForSize(s),
-                        ),
-                    ],
-                  ),
-
-                const SizedBox(height: 12),
-                const Divider(height: 1),
-                const SizedBox(height: 12),
-
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          color: Colors.black.withOpacity(0.04),
-                          border: Border.all(
-                            color: Colors.black.withOpacity(0.08),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                : SingleChildScrollView(
+                    child: Column(
+                      key: const ValueKey('details'),
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            const Text(
-                              'Çmimi',
-                              style:
-                              TextStyle(fontWeight: FontWeight.w900),
-                            ),
-                            const SizedBox(height: 8),
-                            if (hasDisc)
-                              Text(
-                                '€${p.price.toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  color: Colors.grey.shade700,
-                                  decoration: TextDecoration.lineThrough,
-                                  fontWeight: FontWeight.w800,
+                            Expanded(
+                              child: Text(
+                                p.name,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
-                            Row(
-                              children: [
-                                Text(
-                                  '€${fp.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w900,
+                            ),
+                            IconButton(
+                              onPressed: selling
+                                  ? null
+                                  : () => Navigator.pop(context),
+                              icon: const Icon(Icons.close),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        _metaRow('Serial', p.serialNumber ?? '—'),
+                        _metaRow('SKU', p.sku ?? '—'),
+                        _metaRow('Status', p.active ? 'Active' : 'OFF'),
+                        _metaRow('Total', '${p.stockQty}'),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Numrat / Stoku',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
+                        const SizedBox(height: 8),
+
+                        if (sizes.isEmpty)
+                          Text(
+                            'S’ka numra të regjistrum.',
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          )
+                        else
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final s in sizes)
+                                _sizeSelectChip(size: s, qty: p.qtyForSize(s)),
+                            ],
+                          ),
+
+                        const SizedBox(height: 12),
+                        const Divider(height: 1),
+                        const SizedBox(height: 12),
+
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  color: Colors.black.withOpacity(0.04),
+                                  border: Border.all(
+                                    color: Colors.black.withOpacity(0.08),
                                   ),
                                 ),
-                                const SizedBox(width: 10),
-                                if (hasDisc)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                      Colors.orange.withOpacity(0.14),
-                                      borderRadius:
-                                      BorderRadius.circular(999),
-                                      border: Border.all(
-                                        color: Colors.orange
-                                            .withOpacity(0.35),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      '-${p.discountPercent.toStringAsFixed(0)}%',
-                                      style: const TextStyle(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Çmimi',
+                                      style: TextStyle(
                                         fontWeight: FontWeight.w900,
                                       ),
                                     ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              selectedSize == null
-                                  ? 'Zgjedh numrin për me shit.'
-                                  : 'Numri i zgjedhun: ${formatSizeLabel(selectedSize!)}',
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontWeight: FontWeight.w800,
+                                    const SizedBox(height: 8),
+                                    if (hasDisc)
+                                      Text(
+                                        '€${p.price.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade700,
+                                          decoration:
+                                              TextDecoration.lineThrough,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '€${fp.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        if (hasDisc)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange.withOpacity(
+                                                0.14,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                              border: Border.all(
+                                                color: Colors.orange
+                                                    .withOpacity(0.35),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              '-${p.discountPercent.toStringAsFixed(0)}%',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      selectedSize == null
+                                          ? 'Zgjedh numrin për me shit.'
+                                          : 'Numri i zgjedhun: ${formatSizeLabel(selectedSize!)}',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                  ],
-                ),
 
-                const SizedBox(height: 14),
+                        const SizedBox(height: 14),
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed:
-                        selling ? null : () => Navigator.pop(context),
-                        icon: const Icon(Icons.keyboard_return),
-                        label: const Text('Mbyll'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppTheme.success,
-                          foregroundColor: Colors.white,
+                        Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: selling
+                                        ? null
+                                        : () => Navigator.pop(context),
+                                    icon: const Icon(Icons.keyboard_return),
+                                    label: const Text('Mbyll'),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: Colors.blue,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    onPressed:
+                                        (selling ||
+                                            !p.active ||
+                                            selectedSize == null ||
+                                            (selectedSize != null &&
+                                                p.qtyForSize(selectedSize!) <=
+                                                    0))
+                                        ? null
+                                        : () {
+                                            widget.onAddToCart(
+                                              p,
+                                              selectedSize!,
+                                            );
+                                          },
+                                    icon: const Icon(Icons.add_shopping_cart),
+                                    label: const Text('Shto në Shportë'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppTheme.success,
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed:
+                                  (selling ||
+                                      !p.active ||
+                                      selectedSize == null ||
+                                      (selectedSize != null &&
+                                          p.qtyForSize(selectedSize!) <= 0))
+                                  ? null
+                                  : _doSell,
+                              icon: selling
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.point_of_sale),
+                              label: Text(
+                                selling ? 'Duke shitur...' : 'Paguaj',
+                              ),
+                            ),
+                          ],
                         ),
-                        onPressed: (selling ||
-                            !p.active ||
-                            selectedSize == null ||
-                            (selectedSize != null &&
-                                p.qtyForSize(selectedSize!) <= 0))
-                            ? null
-                            : _doSell,
-                        icon: selling
-                            ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
+                        const SizedBox(height: 8),
+                        Text(
+                          (!p.active)
+                              ? 'Ky produkt është OFF.'
+                              : (selectedSize == null)
+                              ? 'Zgjedh numrin (size).'
+                              : (p.qtyForSize(selectedSize!) <= 0)
+                              ? 'S’ka stok për numrin ${formatSizeLabel(selectedSize!)}.'
+                              : 'Kliko “BLEJ” për me e regjistru shitjen.',
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w700,
                           ),
-                        )
-                            : const Icon(Icons.point_of_sale),
-                        label: Text(
-                          selling ? 'Duke shitur...' : 'Paguaj',
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  (!p.active)
-                      ? 'Ky produkt është OFF.'
-                      : (selectedSize == null)
-                      ? 'Zgjedh numrin (size).'
-                      : (p.qtyForSize(selectedSize!) <= 0)
-                      ? 'S’ka stok për numrin ${formatSizeLabel(selectedSize!)}.'
-                      : 'Kliko “BLEJ” për me e regjistru shitjen.',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontWeight: FontWeight.w700,
                   ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
@@ -694,11 +1074,7 @@ class _ProductDialogState extends State<_ProductDialog> {
         child: Text(
           // ✅ HERE is the fix:
           '${formatSizeLabel(size)} ($qty)',
-          style: TextStyle(
-            color: c,
-            fontWeight: FontWeight.w900,
-            fontSize: 12,
-          ),
+          style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 12),
         ),
       ),
     );
@@ -735,7 +1111,8 @@ class _ProductDialogState extends State<_ProductDialog> {
     setState(() => selling = true);
     try {
       // ✅ MERRE USER ID NGA LOGIN
-      final uid = await RoleStore.getUserId(); // <- e shtojmë këtë funksion poshtë
+      final uid =
+          await RoleStore.getUserId(); // <- e shtojmë këtë funksion poshtë
       if (uid <= 0) {
         throw Exception('UserId s’osht i logum (uid=$uid). Bëj logout/login.');
       }
@@ -756,12 +1133,12 @@ class _ProductDialogState extends State<_ProductDialog> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('S’u shit: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('S’u shit: $e')));
       setState(() => selling = false);
     }
   }
-
 
   Widget _successView() {
     final p = widget.product;

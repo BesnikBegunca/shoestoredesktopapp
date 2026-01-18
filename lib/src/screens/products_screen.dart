@@ -20,6 +20,21 @@ class _ProductsScreenState extends State<ProductsScreen> {
   bool _loading = true;
   List<Product> _items = [];
 
+  // ✅ labels për tesha (key 1000..)
+  static const List<String> _clothLabels = [
+    '0-3M',
+    '3-6M',
+    '6-9M',
+    '9-12M',
+    '12-18M',
+    '18-24M',
+    '2Y',
+    '3Y',
+    '4Y',
+    '5Y',
+    '6Y',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -199,7 +214,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        _sizesInline(p0),
+                        _sizesInline(p0), // ✅ shfaq edhe 0-3M...
                       ],
                     ),
                   ),
@@ -256,18 +271,31 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
+  // ✅ key 1000.. => label, ndryshe => numri i patikave
+  String _labelForSizeKey(int key) {
+    if (key >= 1000) {
+      final idx = key - 1000;
+      if (idx >= 0 && idx < _clothLabels.length) {
+        return _clothLabels[idx];
+      }
+    }
+    return key.toString();
+  }
+
   Widget _sizesInline(Product p0) {
-    final sizes = p0.sizesSorted;
+    final sizes = p0.sizesSorted; // keys int
     if (sizes.isEmpty) return const SizedBox.shrink();
 
     return Wrap(
       spacing: 6,
       runSpacing: 6,
-      children: [for (final s in sizes) _sizeChip(s, p0.qtyForSize(s))],
+      children: [
+        for (final s in sizes) _sizeChip(_labelForSizeKey(s), p0.qtyForSize(s)),
+      ],
     );
   }
 
-  Widget _sizeChip(int size, int qty) {
+  Widget _sizeChip(String label, int qty) {
     final ok = qty > 0;
     final c = ok ? Colors.green : Colors.red;
     return Container(
@@ -278,7 +306,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         border: Border.all(color: c.withOpacity(0.35)),
       ),
       child: Text(
-        '$size: $qty',
+        '$label: $qty',
         style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 12),
       ),
     );
@@ -300,6 +328,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 }
 
+// ============================
+// ✅ DIALOG: PATIKA / TESHA
+// ============================
+
+enum ProductKind { shoes, clothes }
+
 class _ProductFormDialog extends StatefulWidget {
   final Product? editing;
   const _ProductFormDialog({required this.editing});
@@ -319,13 +353,35 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   late final TextEditingController discountC;
   late final TextEditingController imagePathC;
 
+  // shoes
   late Map<int, TextEditingController> sizeCtrls;
+
+  // clothes
+  late Map<String, TextEditingController> clothCtrls;
+
+  ProductKind kind = ProductKind.shoes;
 
   bool active = true;
   bool saving = false;
 
   static const int minSize = 17;
   static const int maxSize = 30;
+
+  static const List<String> clothSizes = [
+    '0-3M',
+    '3-6M',
+    '6-9M',
+    '9-12M',
+    '12-18M',
+    '18-24M',
+    '2Y',
+    '3Y',
+    '4Y',
+    '5Y',
+    '6Y',
+  ];
+
+  int _clothKey(int index) => 1000 + index;
 
   @override
   void initState() {
@@ -342,9 +398,19 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     active = p0?.active ?? true;
 
     final existing = p0?.sizeStock ?? {};
+
+    // ✅ nese ka keys 1000+ ose jashtë 17–30, e trajtojmë si TESHA
+    final hasClothLike = existing.keys.any((k) => k >= 1000 || k < minSize || k > maxSize);
+    kind = hasClothLike ? ProductKind.clothes : ProductKind.shoes;
+
     sizeCtrls = {
       for (int s = minSize; s <= maxSize; s++)
         s: TextEditingController(text: (existing[s] ?? 0).toString()),
+    };
+
+    clothCtrls = {
+      for (int i = 0; i < clothSizes.length; i++)
+        clothSizes[i]: TextEditingController(text: (existing[_clothKey(i)] ?? 0).toString()),
     };
   }
 
@@ -357,9 +423,14 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     purchaseC.dispose();
     discountC.dispose();
     imagePathC.dispose();
+
     for (final c in sizeCtrls.values) {
       c.dispose();
     }
+    for (final c in clothCtrls.values) {
+      c.dispose();
+    }
+
     super.dispose();
   }
 
@@ -448,11 +519,25 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
   Map<int, int> _collectSizeStock() {
     final out = <int, int>{};
-    sizeCtrls.forEach((size, ctrl) {
-      final q = _parseInt(ctrl.text);
-      if (q < 0) return;
-      out[size] = q > 0 ? q : 0;
-    });
+
+    if (kind == ProductKind.shoes) {
+      for (final entry in sizeCtrls.entries) {
+        final size = entry.key;
+        final ctrl = entry.value;
+        final q = _parseInt(ctrl.text);
+        if (q < 0) continue;
+        out[size] = q > 0 ? q : 0;
+      }
+    } else {
+      for (int i = 0; i < clothSizes.length; i++) {
+        final label = clothSizes[i];
+        final ctrl = clothCtrls[label]!;
+        final q = _parseInt(ctrl.text);
+        if (q < 0) continue; // ✅ FIX
+        out[_clothKey(i)] = q > 0 ? q : 0;
+      }
+    }
+
     return out;
   }
 
@@ -483,15 +568,28 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       _snack('Zbritja duhet 0–100.');
       return;
     }
-    for (final e in sizeCtrls.entries) {
-      final q = _parseInt(e.value.text);
-      if (q < 0) {
-        _snack('Numri ${e.key}: sasia s’mund me qenë negative.');
-        return;
+
+    // ✅ validate negatives (sipas kind)
+    if (kind == ProductKind.shoes) {
+      for (final e in sizeCtrls.entries) {
+        final q = _parseInt(e.value.text);
+        if (q < 0) {
+          _snack('Numri ${e.key}: sasia s’mund me qenë negative.');
+          return;
+        }
+      }
+    } else {
+      for (final label in clothSizes) {
+        final q = _parseInt(clothCtrls[label]!.text);
+        if (q < 0) {
+          _snack('Masa $label: sasia s’mund me qenë negative.');
+          return;
+        }
       }
     }
+
     if (total <= 0) {
-      _snack('Duhet me pas të paktën 1 palë në stok (në ndonjë numër).');
+      _snack('Duhet me pas të paktën 1 copë në stok (në ndonjë masë).');
       return;
     }
 
@@ -635,19 +733,47 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                   decoration: const InputDecoration(labelText: 'Zbritja (%)'),
                 ),
                 const SizedBox(height: 14),
+
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Stoku sipas numrave (SHOES)',
-                          style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.text)),
-                      const Spacer(),
-                      _totalPill('Total: $totalStock'),
+                      Row(
+                        children: [
+                          const Text(
+                            'Stoku sipas masave',
+                            style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.text),
+                          ),
+                          const Spacer(),
+                          _totalPill('Total: $totalStock'),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          _kindBtn(
+                            label: 'PATIKA',
+                            selected: kind == ProductKind.shoes,
+                            onTap: () => setState(() => kind = ProductKind.shoes),
+                          ),
+                          _kindBtn(
+                            label: 'TESHA',
+                            selected: kind == ProductKind.clothes,
+                            onTap: () => setState(() => kind = ProductKind.clothes),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 10),
-                _sizesGrid(),
+
+                if (kind == ProductKind.shoes) _sizesGrid() else _clothSizesGrid(),
+
                 const SizedBox(height: 14),
 
                 Row(
@@ -725,6 +851,29 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     );
   }
 
+  Widget _kindBtn({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          color: selected ? AppTheme.primaryPurple.withOpacity(0.22) : AppTheme.surface2.withOpacity(0.35),
+          border: Border.all(color: selected ? AppTheme.primaryPurple : AppTheme.stroke),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.w900),
+        ),
+      ),
+    );
+  }
+
   Widget _sizesGrid() {
     final keys = sizeCtrls.keys.toList()..sort();
 
@@ -787,17 +936,80 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     );
   }
 
+  Widget _clothSizesGrid() {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final cols = c.maxWidth >= 620 ? 4 : 2;
+        final tiles = <Widget>[];
+
+        for (final label in clothSizes) {
+          final ctrl = clothCtrls[label]!;
+          final q = _parseInt(ctrl.text);
+          final ok = q > 0;
+          final color = ok ? Colors.green : Colors.red;
+
+          tiles.add(
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: color.withOpacity(0.35)),
+                color: color.withOpacity(0.08),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 64,
+                    child: Text(
+                      label,
+                      style: TextStyle(fontWeight: FontWeight.w900, color: color),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: ctrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                        hintText: '0',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return GridView.count(
+          crossAxisCount: cols,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: tiles,
+        );
+      },
+    );
+  }
   Widget _totalPill(String t) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppTheme.surface2.withOpacity(0.35),
+        color: AppTheme.primaryPurple.withOpacity(0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppTheme.stroke),
+        border: Border.all(color: AppTheme.primaryPurple.withOpacity(0.35)),
       ),
       child: Text(
         t,
-        style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.w900, fontSize: 12),
+        style: const TextStyle(
+          color: AppTheme.text,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
       ),
     );
   }

@@ -1,5 +1,29 @@
 import 'receipt_preview.dart';
 
+// ✅ labels për TESHA (key 1000..)
+const List<String> _clothLabels = [
+  '0-3M',
+  '3-6M',
+  '6-9M',
+  '9-12M',
+  '12-18M',
+  '18-24M',
+  '2Y',
+  '3Y',
+  '4Y',
+  '5Y',
+  '6Y',
+];
+
+// ✅ key 1000.. => label, ndryshe => numri i patikave
+String _labelForSizeKey(int key) {
+  if (key >= 1000) {
+    final idx = key - 1000;
+    if (idx >= 0 && idx < _clothLabels.length) return _clothLabels[idx];
+  }
+  return key.toString();
+}
+
 List<ReceiptLine> buildReceiptLines({
   required String invoiceNo,
   required DateTime date,
@@ -21,7 +45,13 @@ List<ReceiptLine> buildReceiptLines({
 
   lines.add(ReceiptLine('FATURA', invoiceNo, bold: true));
   lines.add(ReceiptLine('Data', dateStr));
-  if (size != null) lines.add(ReceiptLine('Numri', '$size'));
+
+  // ✅ FIX: mos e shfaq 1000,1001… por 0-3M,3-6M…
+  if (size != null) {
+    final sizeLabel = _labelForSizeKey(size);
+    lines.add(ReceiptLine('Numri', sizeLabel));
+  }
+
   lines.add(const ReceiptLine('----------------', ''));
 
   // Item
@@ -35,9 +65,7 @@ List<ReceiptLine> buildReceiptLines({
 
   if (hasDiscount) {
     lines.add(ReceiptLine('Cmimi origjinal', money(unitPriceOriginal)));
-    lines.add(
-      ReceiptLine('Zbritja', '-${discountPercent.toStringAsFixed(0)}%'),
-    );
+    lines.add(ReceiptLine('Zbritja', '-${discountPercent.toStringAsFixed(0)}%'));
     lines.add(ReceiptLine('Cmimi final', money(unitPriceFinal), bold: true));
   } else {
     lines.add(ReceiptLine('Cmimi', money(unitPriceFinal), bold: true));

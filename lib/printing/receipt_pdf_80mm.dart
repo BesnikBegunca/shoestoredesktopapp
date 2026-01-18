@@ -32,7 +32,7 @@ class ReceiptPdf80mm {
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat(
-          80 * PdfPageFormat.mm,
+          60 * PdfPageFormat.mm,
           double.infinity,
           marginAll: 4 * PdfPageFormat.mm,
         ),

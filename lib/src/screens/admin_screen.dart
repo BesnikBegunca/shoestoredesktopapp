@@ -13,8 +13,7 @@ import 'package:printing/printing.dart';
 import '../local/local_api.dart';
 import '../theme/app_theme.dart';
 
-String monthKey(DateTime d) =>
-    '${d.year}-${(d.month).toString().padLeft(2, '0')}';
+String monthKey(DateTime d) => '${d.year}-${(d.month).toString().padLeft(2, '0')}';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -95,7 +94,6 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-
   Future<void> doLogout(BuildContext context) async {
     await RoleStore.clear();
     if (!context.mounted) return;
@@ -105,7 +103,6 @@ class _AdminScreenState extends State<AdminScreen> {
           (_) => false,
     );
   }
-
 
   String _pdfFileName(_ReportScope scope) {
     final now = DateTime.now();
@@ -131,10 +128,9 @@ class _AdminScreenState extends State<AdminScreen> {
   Future<void> _showSuccessDialog(String msg) async {
     if (!mounted) return;
 
-    // hap popup
     showGeneralDialog(
       context: context,
-      barrierDismissible: false, // ✅ mos e lër me klikim (hiqet vet)
+      barrierDismissible: false,
       barrierLabel: 'success',
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (_, __, ___) {
@@ -154,14 +150,11 @@ class _AdminScreenState extends State<AdminScreen> {
       },
     );
 
-    // ✅ mbylle vet pas 900ms
     await Future.delayed(const Duration(milliseconds: 900));
     if (!mounted) return;
 
-    // ✅ rootNavigator e mbyll dialogun sigurt
     Navigator.of(context, rootNavigator: true).pop();
   }
-
 
   Future<void> _loadAll() async {
     setState(() => loading = true);
@@ -210,9 +203,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     _formatMonthLabel(m),
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
-                  trailing: m == selectedMonth
-                      ? const Icon(Icons.check_circle)
-                      : null,
+                  trailing: m == selectedMonth ? const Icon(Icons.check_circle) : null,
                   onTap: () => Navigator.pop(context, m),
                 ),
             ],
@@ -352,9 +343,7 @@ class _AdminScreenState extends State<AdminScreen> {
             children: [
               TextField(
                 controller: amountC,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
                   labelText: 'Amount (€)',
                   border: OutlineInputBorder(),
@@ -392,9 +381,7 @@ class _AdminScreenState extends State<AdminScreen> {
               try {
                 await LocalApi.I.addInvestment(
                   amount: amount,
-                  note: noteC.text.trim().isEmpty
-                      ? null
-                      : noteC.text.trim(),
+                  note: noteC.text.trim().isEmpty ? null : noteC.text.trim(),
                 );
                 if (!mounted) return;
                 Navigator.pop(ctx);
@@ -439,10 +426,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       .map(
                         (c) => DropdownMenuItem(
                       value: c,
-                      child: Text(
-                        c,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
+                      child: Text(c, style: const TextStyle(fontWeight: FontWeight.w800)),
                     ),
                   )
                       .toList(),
@@ -458,9 +442,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 const SizedBox(height: 10),
                 TextField(
                   controller: expAmountC,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
                     labelText: 'Amount (€)',
                     border: OutlineInputBorder(),
@@ -473,9 +455,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     labelText: expCategory == 'Rroga'
                         ? 'Emri i punëtorit / shënim'
                         : 'Shënim (opsional)',
-                    hintText: expCategory == 'Rroga'
-                        ? 'p.sh. Arben - Rroga Janar'
-                        : null,
+                    hintText: expCategory == 'Rroga' ? 'p.sh. Arben - Rroga Janar' : null,
                     border: const OutlineInputBorder(),
                   ),
                 ),
@@ -504,9 +484,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   await LocalApi.I.addExpense(
                     category: expCategory,
                     amount: amount,
-                    note: expNoteC.text.trim().isEmpty
-                        ? null
-                        : expNoteC.text.trim(),
+                    note: expNoteC.text.trim().isEmpty ? null : expNoteC.text.trim(),
                   );
                   if (!mounted) return;
                   Navigator.pop(ctx);
@@ -573,7 +551,6 @@ class _AdminScreenState extends State<AdminScreen> {
         break;
 
       case _ReportScope.year:
-      // placeholder
         sales = 0;
         profit = 0;
         invest = 0;
@@ -727,14 +704,16 @@ class _AdminScreenState extends State<AdminScreen> {
                 _pdfLine(font, fontBold, 'Fitim', _money(profit)),
                 _pdfLine(font, fontBold, 'Investim', _money(invest)),
                 _pdfLine(font, fontBold, 'Shpenzime', _money(expenses)),
-                _pdfLine(font, fontBold, 'Nr. shitjesh', '$countSales'),
-                pw.Divider(),
+                // ✅ SHTESA: Shpenzime + Investime
                 _pdfLine(
                   font,
                   fontBold,
-                  'Neto (Fitim - Shpenzime)',
-                  _money(net),
+                  'Shpenzime + Investime',
+                  _money(expenses + invest),
                 ),
+                _pdfLine(font, fontBold, 'Nr. shitjesh', '$countSales'),
+                pw.Divider(),
+                _pdfLine(font, fontBold, 'Neto (Fitim - Shpenzime)', _money(net)),
               ],
             ),
           ),
@@ -812,12 +791,9 @@ class _AdminScreenState extends State<AdminScreen> {
   // ✅ Activity tile me SLIDE (Revert)
   Widget _activityTile(ActivityItem a) {
     final isSale = a.type == 'SALE';
-    final isInvest = a.type == 'INVEST';
     final isExpense = a.type == 'EXPENSE';
 
-    final c = isSale
-        ? Colors.green
-        : (isExpense ? Colors.deepOrange : Colors.red);
+    final c = isSale ? Colors.green : (isExpense ? Colors.deepOrange : Colors.red);
 
     final isReverted = a.reverted;
     final bg = isReverted ? Colors.grey.withOpacity(0.12) : null;
@@ -866,9 +842,7 @@ class _AdminScreenState extends State<AdminScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            DateTime.fromMillisecondsSinceEpoch(a.createdAtMs)
-                .toLocal()
-                .toString(),
+            DateTime.fromMillisecondsSinceEpoch(a.createdAtMs).toLocal().toString(),
             style: TextStyle(
               color: Colors.grey.shade600,
               fontWeight: FontWeight.w600,
@@ -879,15 +853,10 @@ class _AdminScreenState extends State<AdminScreen> {
       ),
     );
 
-    // ✅ pa slide kur s’ka revert (ose already reverted / pa ID)
     if (!canRevert) {
-      return Card(
-        color: bg,
-        child: tile(),
-      );
+      return Card(color: bg, child: tile());
     }
 
-    // ✅ me slide
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Slidable(
@@ -907,13 +876,12 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
         child: Card(
           margin: EdgeInsets.zero,
-          color: bg, // ✅ gri kur reverted
+          color: bg,
           child: tile(),
         ),
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -939,6 +907,11 @@ class _AdminScreenState extends State<AdminScreen> {
     final expToday = (s?.totalExpensesToday ?? 0).toDouble();
     final expMonth = (s?.totalExpensesMonth ?? 0).toDouble();
     final expAll = (s?.totalExpensesAll ?? 0).toDouble();
+
+    // ✅ SHTESA: Shpenzime + Investime
+    final outToday = investToday + expToday;
+    final outMonth = investMonth + expMonth;
+    final outAll = investAll + expAll;
 
     return Scaffold(
       appBar: AppBar(
@@ -1010,7 +983,6 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
             ),
             const SizedBox(height: 10),
-
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -1019,10 +991,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   children: [
                     const Text(
                       'Statistikat (Sot / Muaj / Total)',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                     ),
                     const SizedBox(height: 10),
                     _tripleHeader(
@@ -1031,7 +1000,6 @@ class _AdminScreenState extends State<AdminScreen> {
                       right: 'TOTAL',
                     ),
                     const SizedBox(height: 10),
-
                     _tripleRow(
                       label: 'Shitje',
                       left: _money(salesToday),
@@ -1039,11 +1007,9 @@ class _AdminScreenState extends State<AdminScreen> {
                       right: _money(salesAll),
                       leftColor: Colors.green,
                       midColor: Colors.blue,
-                      rightColor:
-                      Theme.of(context).colorScheme.onSurface,
+                      rightColor: Theme.of(context).colorScheme.onSurface,
                     ),
                     const SizedBox(height: 8),
-
                     _tripleRow(
                       label: 'Fitim',
                       left: _money(profitToday),
@@ -1051,25 +1017,19 @@ class _AdminScreenState extends State<AdminScreen> {
                       right: _money(profitAll),
                       leftColor: Colors.green,
                       midColor: Colors.blue,
-                      rightColor:
-                      Theme.of(context).colorScheme.onSurface,
+                      rightColor: Theme.of(context).colorScheme.onSurface,
                     ),
                     const SizedBox(height: 8),
-
                     _tripleRow(
                       label: 'Nr. shitjesh',
                       left: '$countToday',
                       mid: '$countMonth',
                       right: '$countAll',
-                      leftColor:
-                      Theme.of(context).colorScheme.onSurface,
-                      midColor:
-                      Theme.of(context).colorScheme.onSurface,
-                      rightColor:
-                      Theme.of(context).colorScheme.onSurface,
+                      leftColor: Theme.of(context).colorScheme.onSurface,
+                      midColor: Theme.of(context).colorScheme.onSurface,
+                      rightColor: Theme.of(context).colorScheme.onSurface,
                     ),
                     const SizedBox(height: 8),
-
                     _tripleRow(
                       label: 'Investim',
                       left: _money(investToday),
@@ -1080,7 +1040,6 @@ class _AdminScreenState extends State<AdminScreen> {
                       rightColor: Colors.red,
                     ),
                     const SizedBox(height: 8),
-
                     _tripleRow(
                       label: 'Shpenzimet',
                       left: _money(expToday),
@@ -1091,10 +1050,21 @@ class _AdminScreenState extends State<AdminScreen> {
                       rightColor: Colors.deepOrange,
                     ),
 
+                    // ✅ SHTESA: Shpenzime + Investime
+                    const SizedBox(height: 8),
+                    _tripleRow(
+                      label: 'Shpenzime + Investime',
+                      left: _money(outToday),
+                      mid: _money(outMonth),
+                      right: _money(outAll),
+                      leftColor: Colors.purple,
+                      midColor: Colors.purple,
+                      rightColor: Colors.purple,
+                    ),
+
                     const SizedBox(height: 12),
                     const Divider(height: 1),
                     const SizedBox(height: 12),
-
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
@@ -1106,9 +1076,7 @@ class _AdminScreenState extends State<AdminScreen> {
                         ),
                         _statCard(
                           'Vlera e Stokut (Final)',
-                          _money(
-                            (s?.totalStockValueFinal ?? 0).toDouble(),
-                          ),
+                          _money((s?.totalStockValueFinal ?? 0).toDouble()),
                           Icons.euro,
                           tint: Colors.green,
                         ),
@@ -1118,9 +1086,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 14),
-
             Row(
               children: [
                 Expanded(
@@ -1144,18 +1110,13 @@ class _AdminScreenState extends State<AdminScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 14),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
                 Text(
                   'Regjistrimet e fundit',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                 ),
                 Text(
                   '(slide -> revert)',
@@ -1164,7 +1125,6 @@ class _AdminScreenState extends State<AdminScreen> {
               ],
             ),
             const SizedBox(height: 10),
-
             if (activity.isEmpty)
               const Card(
                 child: Padding(
@@ -1236,15 +1196,9 @@ class _AdminScreenState extends State<AdminScreen> {
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            color: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest
-                .withOpacity(0.45),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.45),
             border: Border.all(
-              color: Theme.of(context)
-                  .colorScheme
-                  .outlineVariant
-                  .withOpacity(0.7),
+              color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.7),
             ),
           ),
           child: Text(

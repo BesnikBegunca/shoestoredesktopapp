@@ -734,7 +734,17 @@ class _ProductDialogState extends State<_ProductDialog> {
 
     setState(() => selling = true);
     try {
-      final res = await LocalApi.I.sellOne(productId: p.id, size: size);
+      // ✅ MERRE USER ID NGA LOGIN
+      final uid = await RoleStore.getUserId(); // <- e shtojmë këtë funksion poshtë
+      if (uid <= 0) {
+        throw Exception('UserId s’osht i logum (uid=$uid). Bëj logout/login.');
+      }
+
+      final res = await LocalApi.I.sellOne(
+        userId: uid, // ✅ JO 0
+        productId: p.id,
+        size: size,
+      );
 
       await widget.onSold();
 
@@ -744,8 +754,6 @@ class _ProductDialogState extends State<_ProductDialog> {
         soldInvoice = res.invoiceNo;
         soldTotal = res.total;
       });
-
-      // ✅ MOS e mbyll automatikisht.
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -753,6 +761,7 @@ class _ProductDialogState extends State<_ProductDialog> {
       setState(() => selling = false);
     }
   }
+
 
   Widget _successView() {
     final p = widget.product;

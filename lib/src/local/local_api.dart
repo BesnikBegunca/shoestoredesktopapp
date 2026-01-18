@@ -1,3 +1,4 @@
+// local_api.dart
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,7 +7,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shoe_store_manager/models/app_user.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-const int kDbVersion = 6;
+/// ✅ BUMP VERSION (sepse shtuam sales.userId)
+/// Nëse don me e lan 6, mundesh – por 7 është ma “clean”.
+const int kDbVersion = 7;
 
 /* ======================= SQL ======================= */
 
@@ -39,10 +42,12 @@ CREATE TABLE IF NOT EXISTS products (
 );
 ''';
 
+/// ✅ SHTU: userId te sales
 const String kSqlCreateSales = '''
 CREATE TABLE IF NOT EXISTS sales (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   invoiceNo TEXT NOT NULL,
+  userId INTEGER,                 -- ✅ kush e ka bo shitjen
   total REAL NOT NULL,
   profitTotal REAL NOT NULL,
   dayKey TEXT NOT NULL,
@@ -187,16 +192,13 @@ class Product {
   double get finalPrice =>
       calcFinalPrice(price: price, discountPercent: discountPercent);
 
-  // ✅ UI kërkon shpesh "sizeSorted"
   List<int> get sizesSorted {
     final s = sizeStock.keys.toList()..sort();
     return s;
   }
 
-  // ✅ alias për erroret: "sizeSorted isn't defined"
   List<int> get sizeSorted => sizesSorted;
 
-  // ✅ UI error: qtyForSize missing
   int qtyForSize(int size) => sizeStock[size] ?? 0;
 
   static Product fromRow(Map<String, Object?> r) {
@@ -342,7 +344,6 @@ class YearStats {
     required this.countSales,
   });
 
-  // ✅ aliases për UI që pret totalX
   double get totalSales => sales;
   double get totalProfit => profit;
   double get totalInvest => investments;
@@ -360,6 +361,19 @@ class SellResult {
     required this.invoiceNo,
     required this.total,
     required this.profit,
+  });
+}
+
+/// ✅ NEW: Stats per punëtor
+class WorkerStats {
+  final int countSales;
+  final double totalSales;
+  final double totalProfit;
+
+  const WorkerStats({
+    required this.countSales,
+    required this.totalSales,
+    required this.totalProfit,
   });
 }
 
@@ -420,6 +434,7 @@ class LocalApi {
         await _tryAddColumn(d, table: 'sale_items', columnSql: 'shoeSize INTEGER');
 
         await _tryAddColumn(d, table: 'sales', columnSql: 'revertedAtMs INTEGER');
+        await _tryAddColumn(d, table: 'sales', columnSql: 'userId INTEGER'); // ✅ NEW
         await _tryAddColumn(d, table: 'investments', columnSql: 'revertedAtMs INTEGER');
         await _tryAddColumn(d, table: 'expenses', columnSql: 'revertedAtMs INTEGER');
         await _tryAddColumn(d, table: 'expenses', columnSql: 'userId INTEGER');
@@ -436,6 +451,7 @@ class LocalApi {
         await _tryAddColumn(d, table: 'sale_items', columnSql: 'shoeSize INTEGER');
 
         await _tryAddColumn(d, table: 'sales', columnSql: 'revertedAtMs INTEGER');
+        await _tryAddColumn(d, table: 'sales', columnSql: 'userId INTEGER'); // ✅ NEW
         await _tryAddColumn(d, table: 'investments', columnSql: 'revertedAtMs INTEGER');
         await _tryAddColumn(d, table: 'expenses', columnSql: 'revertedAtMs INTEGER');
         await _tryAddColumn(d, table: 'expenses', columnSql: 'userId INTEGER');
@@ -471,7 +487,6 @@ class LocalApi {
     });
   }
 
-  /// ✅ Login me username+password
   Future<AppUser> login({
     required String username,
     required String password,
@@ -495,7 +510,6 @@ class LocalApi {
     return AppUser.fromRow(rows.first);
   }
 
-  /// ✅ vetëm active (default)
   Future<List<AppUser>> getUsers({bool onlyActive = true}) async {
     final db = await _open();
     final rows = await db.query(
@@ -506,14 +520,12 @@ class LocalApi {
     return rows.map(AppUser.fromRow).toList();
   }
 
-  /// ✅ krejt userat (edhe inactive) – për Admin CRUD
   Future<List<AppUser>> getAllUsers() async {
     final db = await _open();
     final rows = await db.query('users', orderBy: 'createdAtMs DESC');
     return rows.map(AppUser.fromRow).toList();
   }
 
-  /// role: 'worker' | 'admin'
   Future<int> createUser({
     required String username,
     required String password,
@@ -539,20 +551,21 @@ class LocalApi {
       throw Exception('Username ekziston already.');
     }
   }
+
   Future<Directory> _imagesDir() async {
-    final dir = await getApplicationSupportDirectory(); // desktop-safe
+    final dir = await getApplicationSupportDirectory();
     final images = Directory(p.join(dir.path, 'shoe_store_manager', 'images'));
     if (!await images.exists()) {
       await images.create(recursive: true);
     }
     return images;
   }
-  /// ✅ Update user (password opsional)
+
   Future<void> updateUser({
     required int userId,
     required String username,
-    String? password, // null/empty -> mos e ndrron
-    required String role, // 'admin' | 'worker'
+    String? password,
+    required String role,
   }) async {
     final db = await _open();
     final u = username.trim();
@@ -672,7 +685,6 @@ class LocalApi {
     await db.delete('products', where: 'id = ?', whereArgs: [id]);
   }
 
-  /// ✅ toggleActive (error i yt)
   Future<void> toggleActive(int id, bool active) async {
     final db = await _open();
     await db.update(
@@ -686,7 +698,6 @@ class LocalApi {
     );
   }
 
-  /// ✅ searchProductsBySerialOrName (error i yt)
   Future<List<Product>> searchProductsBySerialOrName(String q) async {
     final db = await _open();
     final s = q.trim();
@@ -705,9 +716,11 @@ class LocalApi {
 
   // ================= SELL (one item) =================
 
+  /// ✅ SHTU userId
   Future<SellResult> sellOne({
     required int productId,
     required int size,
+    required int userId,
   }) async {
     final db = await _open();
     final now = DateTime.now();
@@ -751,6 +764,7 @@ class LocalApi {
       final invNo = 'INV-$nowMs';
       final saleId = await tx.insert('sales', {
         'invoiceNo': invNo,
+        'userId': userId, // ✅
         'total': total,
         'profitTotal': profit,
         'dayKey': dayKey(now),
@@ -899,7 +913,7 @@ class LocalApi {
   // ================= EXPENSES =================
 
   Future<void> addExpense({
-    int? userId, // ✅ opsional (mos ta prish askund, pranon edhe userId:0)
+    int? userId,
     required String category,
     required double amount,
     String? note,
@@ -1069,7 +1083,6 @@ class LocalApi {
     );
   }
 
-  /// ✅ Pse limit 60? veç për UI mos me u rëndu (mundesh me ndrru kur dush)
   Future<List<ActivityItem>> getActivity({int limit = 60}) async {
     final db = await _open();
 
@@ -1172,7 +1185,6 @@ class LocalApi {
     return items.take(limit).toList();
   }
 
-  /// ✅ Year stats (që t’ka dal getYearStats missing)
   Future<YearStats> getYearStats(int year) async {
     final db = await _open();
     final yPrefix = '$year-';
@@ -1211,6 +1223,50 @@ class LocalApi {
       investments: round2(((inv.first['s'] as num?) ?? 0).toDouble()),
       expenses: round2(((exp.first['s'] as num?) ?? 0).toDouble()),
       countSales: (s.first['c'] as int?) ?? 0,
+    );
+  }
+
+  // ================= WORKER STATS =================
+
+  /// ✅ Raport për një punëtor (Sot / Muaji / Total)
+  /// Kjo funksionon pasi tani sales ka userId.
+  Future<WorkerStats> getWorkerStats({
+    required int userId,
+    required String scope, // 'day' | 'month' | 'total'
+    String? monthKeyFilter,
+  }) async {
+    final db = await _open();
+
+    final where = <String>[
+      'revertedAtMs IS NULL',
+      'userId = ?',
+    ];
+    final args = <Object?>[userId];
+
+    if (scope == 'day') {
+      where.add('dayKey = ?');
+      args.add(dayKey(DateTime.now()));
+    } else if (scope == 'month') {
+      where.add('monthKey = ?');
+      args.add(monthKeyFilter ?? monthKey(DateTime.now()));
+    } else {
+      // total -> pa filter date
+    }
+
+    final rows = await db.rawQuery('''
+SELECT
+  COUNT(*) as c,
+  COALESCE(SUM(total),0) as ts,
+  COALESCE(SUM(profitTotal),0) as tp
+FROM sales
+WHERE ${where.join(' AND ')}
+''', args);
+
+    final r = rows.first;
+    return WorkerStats(
+      countSales: (r['c'] as int?) ?? 0,
+      totalSales: ((r['ts'] as num?) ?? 0).toDouble(),
+      totalProfit: ((r['tp'] as num?) ?? 0).toDouble(),
     );
   }
 }

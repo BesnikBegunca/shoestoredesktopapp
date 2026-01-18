@@ -25,10 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _boot() async {
     await LocalApi.I.init();
-
-    // ✅ Nëse e ke këtë funksion në LocalApi, leje.
-    // Nëse s’e ke, komento rreshtin poshtë.
-    await LocalApi.I.ensureDefaultAdmin();
+    await LocalApi.I.ensureDefaultAdmin(); // default admin
   }
 
   @override
@@ -43,7 +40,10 @@ class _LoginScreenState extends State<LoginScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Gabim', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text(
+          'Gabim',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
         content: Text(msg),
         actions: [
           FilledButton(
@@ -69,17 +69,16 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => loading = true);
 
     try {
-      // ✅ login duhet me kthy: userId, username, role
       final res = await LocalApi.I.login(username: u, password: p);
 
-      final role = res.role == 'admin' ? UserRole.admin : UserRole.worker;
+      final role =
+      res.role == 'admin' ? UserRole.admin : UserRole.worker;
 
       await RoleStore.setSession(
         userId: res.id,
         username: res.username,
         role: role,
       );
-
 
       if (!mounted) return;
 
@@ -110,14 +109,40 @@ class _LoginScreenState extends State<LoginScreen> {
           constraints: const BoxConstraints(maxWidth: 460),
           child: Card(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // ✅ EMRI I DYQANIT
+                  const Text(
+                    'PERLINA KIDS',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Log In',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
                   const Text(
                     'Hyrja',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                    ),
                   ),
+
                   const SizedBox(height: 14),
 
                   TextField(
@@ -128,6 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     onSubmitted: (_) => _doLogin(),
                   ),
+
                   const SizedBox(height: 10),
 
                   TextField(
@@ -137,14 +163,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       labelText: 'Password',
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
-                        onPressed: () => setState(() => hide = !hide),
-                        icon: Icon(hide ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () =>
+                            setState(() => hide = !hide),
+                        icon: Icon(
+                          hide
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                        ),
                       ),
                     ),
                     onSubmitted: (_) => _doLogin(),
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
                   SizedBox(
                     width: double.infinity,
@@ -154,22 +185,18 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
                       )
                           : const Icon(Icons.login),
                       label: Text(loading ? 'Duke hy...' : 'HYR'),
                     ),
                   ),
 
-                  const SizedBox(height: 10),
-                  Text(
-                    'Default Admin: admin / 1234',
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
+                  const SizedBox(height: 12),
+
+
                 ],
               ),
             ),

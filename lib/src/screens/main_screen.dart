@@ -1,7 +1,6 @@
 // main_screen.dart
 import 'dart:async';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:shoe_store_manager/auth/role_store.dart';
 import 'package:shoe_store_manager/printing/receipt_builder.dart';
@@ -26,30 +25,6 @@ class _MainScreenState extends State<MainScreen> {
   bool loading = false;
   String lastQuery = '';
   List<Product> results = [];
-
-  // ✅ labels për tesha (key 1000..)
-  static const List<String> _clothLabels = [
-    '0-3M',
-    '3-6M',
-    '6-9M',
-    '9-12M',
-    '12-18M',
-    '18-24M',
-    '2Y',
-    '3Y',
-    '4Y',
-    '5Y',
-    '6Y',
-  ];
-
-  // ✅ key 1000.. => label, ndryshe => numri i patikave
-  String _labelForSizeKey(int key) {
-    if (key >= 1000) {
-      final idx = key - 1000;
-      if (idx >= 0 && idx < _clothLabels.length) return _clothLabels[idx];
-    }
-    return key.toString();
-  }
 
   @override
   void initState() {
@@ -109,9 +84,8 @@ class _MainScreenState extends State<MainScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gabim: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Gabim: $e')));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -143,9 +117,8 @@ class _MainScreenState extends State<MainScreen> {
       setState(() => results = list);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gabim: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Gabim: $e')));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -160,8 +133,6 @@ class _MainScreenState extends State<MainScreen> {
         onSold: () async {
           await _search(qC.text);
         },
-        // ✅ i kalojmë mapper-in te dialogu
-        labelForSizeKey: _labelForSizeKey,
       ),
     );
   }
@@ -169,11 +140,8 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bg,
       appBar: AppBar(
-        backgroundColor: AppTheme.surface2,
-        foregroundColor: AppTheme.text,
-        title: const Text('Shitja', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text('Shitja'),
         actions: [
           IconButton(
             tooltip: 'Refresh',
@@ -206,10 +174,11 @@ class _MainScreenState extends State<MainScreen> {
               child: loading
                   ? const Center(child: CircularProgressIndicator())
                   : results.isEmpty
-                  ? const Center(child: Text('S’ka rezultate.', style: TextStyle(color: AppTheme.text)))
+                  ? const Center(child: Text('S’ka rezultate.'))
                   : GridView.builder(
                 padding: const EdgeInsets.only(bottom: 12),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 4,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
@@ -227,28 +196,21 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _searchBox() {
     return Card(
-      color: AppTheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: AppTheme.stroke),
-      ),
       child: Padding(
         padding: const EdgeInsets.all(10),
         child: Row(
           children: [
-            const Icon(Icons.search, color: AppTheme.text),
+            const Icon(Icons.search),
             const SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: qC,
-                style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.w800),
                 onChanged: (v) {
                   _onQueryChanged(v);
                   setState(() {});
                 },
                 decoration: const InputDecoration(
                   hintText: 'Kërko me serial / SKU / emër...',
-                  hintStyle: TextStyle(color: AppTheme.muted, fontWeight: FontWeight.w700),
                   border: InputBorder.none,
                 ),
               ),
@@ -261,7 +223,7 @@ class _MainScreenState extends State<MainScreen> {
                   _loadRecent();
                   setState(() {});
                 },
-                icon: const Icon(Icons.close, color: AppTheme.text),
+                icon: const Icon(Icons.close),
               ),
           ],
         ),
@@ -280,12 +242,8 @@ class _MainScreenState extends State<MainScreen> {
       borderRadius: BorderRadius.circular(16),
       onTap: () => _openProductDialog(p),
       child: Card(
-        color: AppTheme.surface,
         elevation: 1.2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppTheme.stroke),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,14 +260,20 @@ class _MainScreenState extends State<MainScreen> {
                       top: 10,
                       right: 10,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.orange.withOpacity(0.90),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
                           '-${p.discountPercent.toStringAsFixed(0)}%',
-                          style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
@@ -335,14 +299,13 @@ class _MainScreenState extends State<MainScreen> {
                               style: const TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 16,
-                                color: AppTheme.text,
                               ),
                             ),
                             const SizedBox(height: 6),
                             Text(
                               p.serialNumber ?? p.sku ?? '—',
-                              style: const TextStyle(
-                                color: AppTheme.muted,
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -356,8 +319,8 @@ class _MainScreenState extends State<MainScreen> {
                           if (hasDisc)
                             Text(
                               '€${p.price.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                color: AppTheme.muted,
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
                                 decoration: TextDecoration.lineThrough,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -367,7 +330,6 @@ class _MainScreenState extends State<MainScreen> {
                             style: const TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 18,
-                              color: AppTheme.text,
                             ),
                           ),
                         ],
@@ -381,14 +343,18 @@ class _MainScreenState extends State<MainScreen> {
                     children: [
                       _pill('Stok: ${p.stockQty}', stockColor),
                       _pill(p.active ? 'Active' : 'OFF', activeColor),
-                      if (hasDisc) _pill('-${p.discountPercent.toStringAsFixed(0)}%', Colors.orange),
+                      if (hasDisc)
+                        _pill(
+                          '-${p.discountPercent.toStringAsFixed(0)}%',
+                          Colors.orange,
+                        ),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  const Text(
+                  Text(
                     'Kliko për detaje',
                     style: TextStyle(
-                      color: AppTheme.muted,
+                      color: Colors.grey.shade600,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
                     ),
@@ -424,14 +390,7 @@ class _ProductDialog extends StatefulWidget {
   final Product product;
   final Future<void> Function() onSold;
 
-  // ✅ mapper që e kthen key -> label (p.sh 1000 -> 0-3M)
-  final String Function(int key) labelForSizeKey;
-
-  const _ProductDialog({
-    required this.product,
-    required this.onSold,
-    required this.labelForSizeKey,
-  });
+  const _ProductDialog({required this.product, required this.onSold});
 
   @override
   State<_ProductDialog> createState() => _ProductDialogState();
@@ -466,11 +425,7 @@ class _ProductDialogState extends State<_ProductDialog> {
 
     final sizes = p.sizesSorted;
 
-    final selectedLabel = selectedSize == null ? null : widget.labelForSizeKey(selectedSize!);
-
     return Dialog(
-      backgroundColor: AppTheme.surface,
-      surfaceTintColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 620),
@@ -493,13 +448,14 @@ class _ProductDialogState extends State<_ProductDialog> {
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
-                          color: AppTheme.text,
                         ),
                       ),
                     ),
                     IconButton(
-                      onPressed: selling ? null : () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, color: AppTheme.text),
+                      onPressed: selling
+                          ? null
+                          : () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
                     ),
                   ],
                 ),
@@ -511,13 +467,17 @@ class _ProductDialogState extends State<_ProductDialog> {
                 const SizedBox(height: 12),
                 const Text(
                   'Numrat / Stoku',
-                  style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.text),
+                  style: TextStyle(fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 8),
+
                 if (sizes.isEmpty)
-                  const Text(
+                  Text(
                     'S’ka numra të regjistrum.',
-                    style: TextStyle(color: AppTheme.muted, fontWeight: FontWeight.w800),
+                    style: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w800,
+                    ),
                   )
                 else
                   Wrap(
@@ -531,9 +491,11 @@ class _ProductDialogState extends State<_ProductDialog> {
                         ),
                     ],
                   ),
+
                 const SizedBox(height: 12),
-                const Divider(height: 1, color: AppTheme.stroke),
+                const Divider(height: 1),
                 const SizedBox(height: 12),
+
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -542,20 +504,27 @@ class _ProductDialogState extends State<_ProductDialog> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(14),
-                          color: AppTheme.surface2.withOpacity(0.35),
-                          border: Border.all(color: AppTheme.stroke),
+                          color: Colors.black.withOpacity(0.04),
+                          border: Border.all(
+                            color: Colors.black.withOpacity(0.08),
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Çmimi', style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.text)),
+                            const Text(
+                              'Çmimi',
+                              style:
+                              TextStyle(fontWeight: FontWeight.w900),
+                            ),
                             const SizedBox(height: 8),
                             if (hasDisc)
                               Text(
                                 '€${p.price.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  color: AppTheme.muted,
-                                  decoration: TextDecoration.lineThrough,
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  decoration:
+                                  TextDecoration.lineThrough,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -566,32 +535,41 @@ class _ProductDialogState extends State<_ProductDialog> {
                                   style: const TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w900,
-                                    color: AppTheme.text,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 if (hasDisc)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.orange.withOpacity(0.14),
-                                      borderRadius: BorderRadius.circular(999),
-                                      border: Border.all(color: Colors.orange.withOpacity(0.35)),
+                                      color: Colors.orange
+                                          .withOpacity(0.14),
+                                      borderRadius:
+                                      BorderRadius.circular(999),
+                                      border: Border.all(
+                                        color: Colors.orange
+                                            .withOpacity(0.35),
+                                      ),
                                     ),
                                     child: Text(
                                       '-${p.discountPercent.toStringAsFixed(0)}%',
-                                      style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.text),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                     ),
                                   ),
                               ],
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              selectedLabel == null
-                                  ? 'Zgjedh masën për me shit.'
-                                  : 'Masa e zgjedhun: $selectedLabel',
-                              style: const TextStyle(
-                                color: AppTheme.muted,
+                              selectedSize == null
+                                  ? 'Zgjedh numrin për me shit.'
+                                  : 'Numri i zgjedhun: $selectedSize',
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -601,12 +579,16 @@ class _ProductDialogState extends State<_ProductDialog> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 14),
+
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: selling ? null : () => Navigator.pop(context),
+                        onPressed: selling
+                            ? null
+                            : () => Navigator.pop(context),
                         icon: const Icon(Icons.keyboard_return),
                         label: const Text('Mbyll'),
                       ),
@@ -621,17 +603,22 @@ class _ProductDialogState extends State<_ProductDialog> {
                         onPressed: (selling ||
                             !p.active ||
                             selectedSize == null ||
-                            (selectedSize != null && p.qtyForSize(selectedSize!) <= 0))
+                            (selectedSize != null &&
+                                p.qtyForSize(selectedSize!) <= 0))
                             ? null
                             : _doSell,
                         icon: selling
                             ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
                         )
                             : const Icon(Icons.point_of_sale),
-                        label: Text(selling ? 'Duke shitur...' : 'Paguaj'),
+                        label: Text(
+                          selling ? 'Duke shitur...' : 'Paguaj',
+                        ),
                       ),
                     ),
                   ],
@@ -641,12 +628,12 @@ class _ProductDialogState extends State<_ProductDialog> {
                   (!p.active)
                       ? 'Ky produkt është OFF.'
                       : (selectedSize == null)
-                      ? 'Zgjedh masën (size).'
+                      ? 'Zgjedh numrin (size).'
                       : (p.qtyForSize(selectedSize!) <= 0)
-                      ? 'S’ka stok për masën ${widget.labelForSizeKey(selectedSize!)}.'
-                      : 'Kliko “Paguaj” për me e regjistru shitjen.',
-                  style: const TextStyle(
-                    color: AppTheme.muted,
+                      ? 'S’ka stok për numrin $selectedSize.'
+                      : 'Kliko “BLEJ” për me e regjistru shitjen.',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -663,8 +650,6 @@ class _ProductDialogState extends State<_ProductDialog> {
     final c = ok ? Colors.green : Colors.red;
     final selected = selectedSize == size;
 
-    final label = widget.labelForSizeKey(size); // ✅ 0-3M / 3-6M / 17 / 18...
-
     return InkWell(
       borderRadius: BorderRadius.circular(999),
       onTap: ok ? () => setState(() => selectedSize = size) : null,
@@ -679,7 +664,7 @@ class _ProductDialogState extends State<_ProductDialog> {
           ),
         ),
         child: Text(
-          '$label ($qty)', // ✅ s’del ma 1000
+          '$size ($qty)',
           style: TextStyle(
             color: c,
             fontWeight: FontWeight.w900,
@@ -699,14 +684,14 @@ class _ProductDialogState extends State<_ProductDialog> {
             width: 70,
             child: Text(
               k,
-              style: const TextStyle(color: AppTheme.muted, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
           Expanded(
-            child: Text(
-              v,
-              style: const TextStyle(fontWeight: FontWeight.w900, color: AppTheme.text),
-            ),
+            child: Text(v, style: const TextStyle(fontWeight: FontWeight.w900)),
           ),
         ],
       ),
@@ -732,16 +717,17 @@ class _ProductDialogState extends State<_ProductDialog> {
       });
 
       // ✅ MOS e mbyll automatikisht.
+      // Dialogu mbyllet vetëm kur klikon PRINT (ose mundesh me shtu “Mbyll” buton).
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('S’u shit: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('S’u shit: $e')));
       setState(() => selling = false);
     }
   }
 
   Widget _successView() {
     final p = widget.product;
-    final sizeLabel = selectedSize == null ? null : widget.labelForSizeKey(selectedSize!);
 
     return Column(
       key: const ValueKey('success'),
@@ -761,39 +747,39 @@ class _ProductDialogState extends State<_ProductDialog> {
         const SizedBox(height: 14),
         const Text(
           'U shit me sukses ✅',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.text),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 10),
+
         if (soldInvoice != null)
           Text(
             'Invoice: $soldInvoice',
-            style: const TextStyle(color: AppTheme.muted, fontWeight: FontWeight.w800),
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w800,
+            ),
           ),
+
         if (soldTotal != null)
           Text(
             'Total: €${soldTotal!.toStringAsFixed(2)}',
-            style: const TextStyle(color: AppTheme.muted, fontWeight: FontWeight.w800),
+            style: TextStyle(
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-        if (sizeLabel != null)
-          Text(
-            'Masa: $sizeLabel',
-            style: const TextStyle(color: AppTheme.muted, fontWeight: FontWeight.w800),
-          ),
+
         const SizedBox(height: 12),
 
         // ✅ PREVIEW (nuk mbyllet dialogu)
         FilledButton.tonalIcon(
           onPressed: () {
-            // NOTE:
-            // Nëse buildReceiptLines e pranon "sizeLabel", përdore.
-            // Nëse jo, e lë "size: selectedSize" si int.
             final lines = buildReceiptLines(
               invoiceNo: soldInvoice ?? 'INV-TEST',
               date: DateTime.now(),
               productName: p.name,
               qty: 1,
-              size: selectedSize, // keep int for DB logic
-              // sizeLabel: sizeLabel, // ✅ nëse e ke në receipt_builder, çoje këtë
+              size: selectedSize, // nëse e ki selectedSize
               unitPriceFinal: p.finalPrice,
               totalFinal: soldTotal ?? p.finalPrice,
               unitPriceOriginal: p.price,
@@ -826,7 +812,6 @@ class _ProductDialogState extends State<_ProductDialog> {
               productName: p.name,
               qty: 1,
               size: selectedSize,
-              // sizeLabel: sizeLabel, // ✅ nëse e ke në receipt_builder, çoje këtë
               unitPriceFinal: p.finalPrice,
               totalFinal: soldTotal ?? p.finalPrice,
               unitPriceOriginal: p.price,
@@ -839,7 +824,7 @@ class _ProductDialogState extends State<_ProductDialog> {
               jobName: soldInvoice ?? 'receipt',
             );
 
-            if (mounted) Navigator.pop(context);
+            if (mounted) Navigator.pop(context); // ✅ mbyllet pasi ta printon
           },
           icon: const Icon(Icons.print),
           label: const Text('PRINTO FATUREN'),
@@ -847,6 +832,7 @@ class _ProductDialogState extends State<_ProductDialog> {
 
         const SizedBox(height: 10),
 
+        // ✅ buton mbyll
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Mbyll'),
@@ -854,4 +840,5 @@ class _ProductDialogState extends State<_ProductDialog> {
       ],
     );
   }
+
 }

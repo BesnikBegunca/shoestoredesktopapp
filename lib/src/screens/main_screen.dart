@@ -494,7 +494,8 @@ class _MainScreenState extends State<MainScreen> {
       // Show success dialog
       showDialog(
         context: context,
-        builder: (_) => _CheckoutSuccessDialog(
+        barrierDismissible: false,
+        builder: (dCtx) => _CheckoutSuccessDialog(
           invoiceNo: res.invoiceNo,
           total: res.total,
           cartItems: cartItemsForReceipt,
@@ -510,9 +511,14 @@ class _MainScreenState extends State<MainScreen> {
               lines: lines,
               jobName: res.invoiceNo,
             );
+
+            // ✅ mbyll success dialog-un + cart dialog-un
+            if (dCtx.mounted) Navigator.of(dCtx).pop(); // close success
+            if (context.mounted) Navigator.of(context).pop(); // close cart
           },
         ),
       );
+
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

@@ -1338,6 +1338,42 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  Future<void> _openActivityDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(
+          'Aktiviteti i fundit',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        content: SizedBox(
+          width: 800,
+          height: 600,
+          child: activity.isEmpty
+              ? Center(
+                  child: Text(
+                    'S\'ka aktivitet.',
+                    style: TextStyle(
+                      color: AppTheme.muted,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: activity.length,
+                  itemBuilder: (_, i) => _activityTile(activity[i]),
+                ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('MBYLL'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // =======================
   // UI
   // =======================
@@ -1731,6 +1767,59 @@ class _AdminScreenState extends State<AdminScreen> {
 
         const SizedBox(height: 14),
 
+        // ✅ INVENTORY METRICS - separate grid below the main stats
+        if (s != null)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.surface2.withOpacity(0.35),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.stroke),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Inventari',
+                  style: const TextStyle(
+                    color: AppTheme.text,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: _statCard(
+                          'Total Stock',
+                          '${s.totalStock} pcs',
+                          Icons.inventory,
+                          Colors.purple,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: _statCard(
+                          'Stock Value',
+                          _money(s.totalStockValueFinal),
+                          Icons.attach_money,
+                          Colors.purple.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: 14),
+
         // activity
         Expanded(
           child: Container(
@@ -1743,13 +1832,27 @@ class _AdminScreenState extends State<AdminScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Aktiviteti i fundit',
-                  style: TextStyle(
-                    color: AppTheme.text,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14,
-                  ),
+                Row(
+                  children: [
+                    const Text(
+                      'Aktiviteti i fundit',
+                      style: TextStyle(
+                        color: AppTheme.text,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const Spacer(),
+                    OutlinedButton.icon(
+                      onPressed: _openActivityDialog,
+                      icon: const Icon(Icons.fullscreen),
+                      label: const Text('See full size'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.text,
+                        side: const BorderSide(color: AppTheme.stroke),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 10),
                 Expanded(

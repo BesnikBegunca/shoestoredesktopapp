@@ -11,6 +11,8 @@ import 'package:shoe_store_manager/auth/role_store.dart';
 import 'package:shoe_store_manager/models/app_user.dart';
 
 import '../local/local_api.dart';
+import '../../printing/receipt_builder.dart';
+import '../../printing/receipt_pdf_80mm.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
 
@@ -46,6 +48,7 @@ class _AdminScreenState extends State<AdminScreen> {
   bool userStatsLoading = false;
   WorkerStats? selectedUserStats;
   String selectedUserStatsScope = 'total';
+  bool settlingWorker = false;
 
   // INVEST
   final amountC = TextEditingController();
@@ -1252,23 +1255,68 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Column(
                   children: [
                     _statsGroup('Sot', [
-                      _statCard('Shitje Sot', _money(dayStats.totalSales), Icons.payments, Colors.green),
-                      _statCard('Nr. Shitjesh Sot', '${dayStats.countSales}', Icons.confirmation_number, Colors.green),
-                      _statCard('Fitim Sot', _money(dayStats.totalProfit), Icons.trending_up, Colors.green),
+                      _statCard(
+                        'Shitje Sot',
+                        _money(dayStats.totalSales),
+                        Icons.payments,
+                        Colors.green,
+                      ),
+                      _statCard(
+                        'Nr. Shitjesh Sot',
+                        '${dayStats.countSales}',
+                        Icons.confirmation_number,
+                        Colors.green,
+                      ),
+                      _statCard(
+                        'Fitim Sot',
+                        _money(dayStats.totalProfit),
+                        Icons.trending_up,
+                        Colors.green,
+                      ),
                     ]),
                     const SizedBox(height: 14),
 
                     _statsGroup('Muaji', [
-                      _statCard('Shitje Muaji', _money(monthStats.totalSales), Icons.calendar_month, Colors.blue),
-                      _statCard('Nr. Shitjesh Muaji', '${monthStats.countSales}', Icons.confirmation_number, Colors.blue),
-                      _statCard('Fitim Muaji', _money(monthStats.totalProfit), Icons.assessment, Colors.blue),
+                      _statCard(
+                        'Shitje Muaji',
+                        _money(monthStats.totalSales),
+                        Icons.calendar_month,
+                        Colors.blue,
+                      ),
+                      _statCard(
+                        'Nr. Shitjesh Muaji',
+                        '${monthStats.countSales}',
+                        Icons.confirmation_number,
+                        Colors.blue,
+                      ),
+                      _statCard(
+                        'Fitim Muaji',
+                        _money(monthStats.totalProfit),
+                        Icons.assessment,
+                        Colors.blue,
+                      ),
                     ]),
                     const SizedBox(height: 14),
 
                     _statsGroup('Total', [
-                      _statCard('Shitje Total', _money(totalStats.totalSales), Icons.all_inclusive, Colors.teal),
-                      _statCard('Nr. Shitjesh Total', '${totalStats.countSales}', Icons.confirmation_number, Colors.teal),
-                      _statCard('Fitim Total', _money(totalStats.totalProfit), Icons.star, Colors.teal),
+                      _statCard(
+                        'Shitje Total',
+                        _money(totalStats.totalSales),
+                        Icons.all_inclusive,
+                        Colors.teal,
+                      ),
+                      _statCard(
+                        'Nr. Shitjesh Total',
+                        '${totalStats.countSales}',
+                        Icons.confirmation_number,
+                        Colors.teal,
+                      ),
+                      _statCard(
+                        'Fitim Total',
+                        _money(totalStats.totalProfit),
+                        Icons.star,
+                        Colors.teal,
+                      ),
                     ]),
                   ],
                 ),
@@ -1283,7 +1331,6 @@ class _AdminScreenState extends State<AdminScreen> {
           ],
         ),
       );
-
     } catch (e) {
       _showError('Gabim: $e');
     } finally {
@@ -1832,6 +1879,32 @@ class _AdminScreenState extends State<AdminScreen> {
                                   tooltip: 'Stats',
                                   onPressed: () => _openUserStatsDialog(u),
                                   icon: const Icon(Icons.bar_chart),
+                                ),
+                                IconButton(
+                                  tooltip: 'Settle Worker',
+                                  onPressed: settlingWorker
+                                      ? null
+                                      : () async {
+                                          setState(() => settlingWorker = true);
+                                          try {
+                                            await LocalApi.I.settleWorkerToday(
+                                              u.id,
+                                              u.username,
+                                            );
+                                            await _showSuccessDialog(
+                                              'Punëtori ${u.username} u pagua për sot ✅',
+                                            );
+                                          } catch (e) {
+                                            _showError('$e');
+                                          } finally {
+                                            if (mounted) {
+                                              setState(
+                                                () => settlingWorker = false,
+                                              );
+                                            }
+                                          }
+                                        },
+                                  icon: const Icon(Icons.payment),
                                 ),
                                 IconButton(
                                   tooltip: 'Edit',

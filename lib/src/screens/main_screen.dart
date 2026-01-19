@@ -229,32 +229,78 @@ class _MainScreenState extends State<MainScreen> {
           const SizedBox(width: 6),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            _searchBox(),
-            const SizedBox(height: 10),
-            Expanded(
-              child: loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : results.isEmpty
-                  ? const Center(child: Text('S’ka rezultate.'))
-                  : GridView.builder(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 4,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                            childAspectRatio: 0.9,
-                          ),
-                      itemCount: results.length,
-                      itemBuilder: (_, i) => _productCard(results[i]),
+      body: Row(
+        children: [
+          // Sidebar for workers
+          FutureBuilder<UserRole?>(
+            future: RoleStore.getSessionRole(),
+            builder: (context, snapshot) {
+              if (snapshot.data == UserRole.worker) {
+                return Container(
+                  width: 200,
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    border: Border(
+                      right: BorderSide(color: AppTheme.stroke, width: 1),
                     ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Punëtor',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        FilledButton.icon(
+                          onPressed: _barazohu,
+                          icon: const Icon(Icons.assignment_turned_in),
+                          label: const Text('Barazohu'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+          // Main content
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  _searchBox(),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : results.isEmpty
+                        ? const Center(child: Text('S’ka rezultate.'))
+                        : GridView.builder(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 4,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                  childAspectRatio: 0.9,
+                                ),
+                            itemCount: results.length,
+                            itemBuilder: (_, i) => _productCard(results[i]),
+                          ),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -518,7 +564,6 @@ class _MainScreenState extends State<MainScreen> {
           },
         ),
       );
-
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -526,6 +571,54 @@ class _MainScreenState extends State<MainScreen> {
       ).showSnackBar(SnackBar(content: Text('Gabim gjatë checkout: $e')));
     } finally {
       if (mounted) setState(() => checkingOut = false);
+    }
+  }
+
+  Future<void> _barazohu() async {
+    try {
+      final uid = await RoleStore.getUserId();
+      if (uid <= 0) {
+        throw Exception('UserId s\'osht i logum (uid=$uid). Bëj logout/login.');
+      }
+
+      final username = await RoleStore.getUsername();
+      if (username == null) {
+        throw Exception('Username nuk u gjet.');
+      }
+
+      final stats = await LocalApi.I.getWorkerStats(userId: uid, scope: 'day');
+
+      if (stats.totalSales <= 0) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('S’ka shitje për sot.')));
+        return;
+      }
+
+      final lines = <ReceiptLine>[
+        ReceiptLine('DAILY SALES STATUS', '', bold: true),
+        ReceiptLine('Worker', username, bold: true),
+        ReceiptLine('Date', DateTime.now().toString().split(' ')[0]),
+        ReceiptLine('Total Sales', '€${stats.totalSales.toStringAsFixed(2)}'),
+        ReceiptLine('Number of Sales', '${stats.countSales}'),
+      ];
+
+      await ReceiptPdf80mm.printOrSave(
+        title: 'DAILY STATUS',
+        lines: lines,
+        jobName:
+            'daily-status-$username-${DateTime.now().toString().split(' ')[0]}',
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Statusi ditor u printua ✅')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gabim: $e')));
     }
   }
 }

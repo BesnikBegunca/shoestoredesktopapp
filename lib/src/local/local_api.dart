@@ -7,9 +7,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shoe_store_manager/models/app_user.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-/// ✅ BUMP VERSION (sepse shtuam sales.userId)
-/// Nëse don me e lan 6, mundesh – por 7 është ma “clean”.
-const int kDbVersion = 7;
+import '../../printing/receipt_pdf_80mm.dart';
+import '../../printing/receipt_preview.dart';
+
+/// ✅ DB VERSION
+/// IMPORTANT: Kur shton tabela/kolona, rrite version-in
+const int kDbVersion = 8;
 
 /* ======================= SQL ======================= */
 
@@ -42,18 +45,19 @@ CREATE TABLE IF NOT EXISTS products (
 );
 ''';
 
-/// ✅ SHTU: userId te sales
+/// ✅ sales: userId + revertedAtMs + settledAtMs
 const String kSqlCreateSales = '''
 CREATE TABLE IF NOT EXISTS sales (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   invoiceNo TEXT NOT NULL,
-  userId INTEGER,                 -- ✅ kush e ka bo shitjen
+  userId INTEGER,                 -- kush e ka bo shitjen
   total REAL NOT NULL,
   profitTotal REAL NOT NULL,
   dayKey TEXT NOT NULL,
   monthKey TEXT NOT NULL,
   createdAtMs INTEGER NOT NULL,
-  revertedAtMs INTEGER
+  revertedAtMs INTEGER,
+  settledAtMs INTEGER             -- ✅ NEW: kur u barazua (mbyll dita)
 );
 ''';
 
@@ -99,6 +103,19 @@ CREATE TABLE IF NOT EXISTS expenses (
   monthKey TEXT NOT NULL,
   createdAtMs INTEGER NOT NULL,
   revertedAtMs INTEGER
+);
+''';
+
+/// ✅ NEW: settlements table
+/// UNIQUE(userId, dayKey) -> s'lejon barazim dy her ne dite per te njejtin punetor
+const String kSqlCreateSettlements = '''
+CREATE TABLE IF NOT EXISTS settlements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  dayKey TEXT NOT NULL,
+  totalSales REAL NOT NULL,
+  settledAtMs INTEGER NOT NULL,
+  UNIQUE(userId, dayKey)
 );
 ''';
 
@@ -381,7 +398,7 @@ class CartItem {
       (unitPrice - (product.purchasePrice ?? 0)) * quantity;
 }
 
-/// ✅ NEW: Stats per punëtor
+/// ✅ Stats per punëtor
 class WorkerStats {
   final int countSales;
   final double totalSales;
@@ -437,14 +454,17 @@ class LocalApi {
         await d.execute(kSqlCreateSaleItems);
         await d.execute(kSqlCreateInvestments);
         await d.execute(kSqlCreateExpenses);
+        await d.execute(kSqlCreateSettlements); // ✅ NEW
       },
       onUpgrade: (d, oldV, newV) async {
+        // ensure tables exist
         await d.execute(kSqlCreateUsers);
         await d.execute(kSqlCreateProducts);
         await d.execute(kSqlCreateSales);
         await d.execute(kSqlCreateSaleItems);
         await d.execute(kSqlCreateInvestments);
         await d.execute(kSqlCreateExpenses);
+        await d.execute(kSqlCreateSettlements); // ✅ NEW
 
         // columns for old dbs
         await _tryAddColumn(
@@ -463,11 +483,13 @@ class LocalApi {
           table: 'sales',
           columnSql: 'revertedAtMs INTEGER',
         );
+        await _tryAddColumn(d, table: 'sales', columnSql: 'userId INTEGER');
         await _tryAddColumn(
           d,
           table: 'sales',
-          columnSql: 'userId INTEGER',
+          columnSql: 'settledAtMs INTEGER',
         ); // ✅ NEW
+
         await _tryAddColumn(
           d,
           table: 'investments',
@@ -487,6 +509,7 @@ class LocalApi {
         await d.execute(kSqlCreateSaleItems);
         await d.execute(kSqlCreateInvestments);
         await d.execute(kSqlCreateExpenses);
+        await d.execute(kSqlCreateSettlements); // ✅ NEW
 
         await _tryAddColumn(
           d,
@@ -504,11 +527,13 @@ class LocalApi {
           table: 'sales',
           columnSql: 'revertedAtMs INTEGER',
         );
+        await _tryAddColumn(d, table: 'sales', columnSql: 'userId INTEGER');
         await _tryAddColumn(
           d,
           table: 'sales',
-          columnSql: 'userId INTEGER',
+          columnSql: 'settledAtMs INTEGER',
         ); // ✅ NEW
+
         await _tryAddColumn(
           d,
           table: 'investments',
@@ -535,8 +560,6 @@ class LocalApi {
 
   // ================= USERS / AUTH =================
 
-  /// ✅ Krijon admin default nëse s’ka asnjë admin.
-  /// username: admin , password: 1234
   Future<void> ensureDefaultAdmin() async {
     final db = await _open();
     final rows = await db.rawQuery(
@@ -617,15 +640,6 @@ class LocalApi {
     } catch (_) {
       throw Exception('Username ekziston already.');
     }
-  }
-
-  Future<Directory> _imagesDir() async {
-    final dir = await getApplicationSupportDirectory();
-    final images = Directory(p.join(dir.path, 'shoe_store_manager', 'images'));
-    if (!await images.exists()) {
-      await images.create(recursive: true);
-    }
-    return images;
   }
 
   Future<void> updateUser({
@@ -794,7 +808,6 @@ class LocalApi {
 
   // ================= SELL (one item) =================
 
-  /// ✅ SHTU userId
   Future<SellResult> sellOne({
     required int productId,
     required int size,
@@ -842,13 +855,14 @@ class LocalApi {
       final invNo = 'INV-$nowMs';
       final saleId = await tx.insert('sales', {
         'invoiceNo': invNo,
-        'userId': userId, // ✅
+        'userId': userId,
         'total': total,
         'profitTotal': profit,
         'dayKey': dayKey(now),
         'monthKey': monthKey(now),
         'createdAtMs': nowMs,
         'revertedAtMs': null,
+        'settledAtMs': null, // ✅ NEW
       });
 
       await tx.insert('sale_items', {
@@ -875,9 +889,8 @@ class LocalApi {
     });
   }
 
-  // ================= SELL (multiple items from cart) =================
+  // ================= SELL (multiple) =================
 
-  /// ✅ Sell multiple items from cart
   Future<SellResult> sellMany({
     required List<CartItem> cartItems,
     required int userId,
@@ -892,7 +905,7 @@ class LocalApi {
       double total = 0;
       double totalProfit = 0;
 
-      // Validate stock and calculate totals
+      // Validate stock + totals
       for (final item in cartItems) {
         final prodRows = await tx.query(
           'products',
@@ -900,8 +913,9 @@ class LocalApi {
           whereArgs: [item.product.id],
           limit: 1,
         );
-        if (prodRows.isEmpty)
+        if (prodRows.isEmpty) {
           throw Exception('Produkti nuk ekziston: ${item.product.name}');
+        }
 
         final p0 = Product.fromRow(prodRows.first);
         if (!p0.active)
@@ -909,16 +923,17 @@ class LocalApi {
 
         final map = Map<int, int>.from(p0.sizeStock);
         final q = map[item.size] ?? 0;
-        if (q < item.quantity)
+        if (q < item.quantity) {
           throw Exception(
             'S’ka stok për numrin ${item.size} (${item.product.name}).',
           );
+        }
 
         total += item.lineTotal;
         totalProfit += item.lineProfit;
       }
 
-      // Update stock for each item
+      // Update stock
       for (final item in cartItems) {
         final prodRows = await tx.query(
           'products',
@@ -956,6 +971,7 @@ class LocalApi {
         'monthKey': monthKey(now),
         'createdAtMs': nowMs,
         'revertedAtMs': null,
+        'settledAtMs': null, // ✅ NEW
       });
 
       // Insert sale items
@@ -1009,6 +1025,7 @@ class LocalApi {
         where: 'saleId = ?',
         whereArgs: [saleId],
       );
+
       if (items.isEmpty) {
         await tx.update(
           'sales',
@@ -1079,8 +1096,9 @@ class LocalApi {
       limit: 1,
     );
     if (rows.isEmpty) throw Exception('Investimi nuk ekziston.');
-    if (rows.first['revertedAtMs'] != null)
+    if (rows.first['revertedAtMs'] != null) {
       throw Exception('Ky investim veç është revert-uar.');
+    }
 
     await db.update(
       'investments',
@@ -1101,8 +1119,9 @@ class LocalApi {
       limit: 1,
     );
     if (rows.isEmpty) throw Exception('Shpenzimi nuk ekziston.');
-    if (rows.first['revertedAtMs'] != null)
+    if (rows.first['revertedAtMs'] != null) {
       throw Exception('Ky shpenzim veç është revert-uar.');
+    }
 
     await db.update(
       'expenses',
@@ -1475,8 +1494,9 @@ class LocalApi {
 
   // ================= WORKER STATS =================
 
-  /// ✅ Raport për një punëtor (Sot / Muaji / Total)
-  /// Kjo funksionon pasi tani sales ka userId.
+  /// ✅ scope:
+  /// - 'day'  -> vetem sot, dhe VETEM ato qe s'jane settled (pra dita "bohet 0" pas barazimit)
+  /// - 'month'/'total' -> i merr krejt (edhe settled), se për raport mujor/total e don historinë
   Future<WorkerStats> getWorkerStats({
     required int userId,
     required String scope, // 'day' | 'month' | 'total'
@@ -1490,6 +1510,9 @@ class LocalApi {
     if (scope == 'day') {
       where.add('dayKey = ?');
       args.add(dayKey(DateTime.now()));
+
+      // ✅ kjo e bon "dita = 0" pas settlement
+      where.add('settledAtMs IS NULL');
     } else if (scope == 'month') {
       where.add('monthKey = ?');
       args.add(monthKeyFilter ?? monthKey(DateTime.now()));
@@ -1512,5 +1535,102 @@ WHERE ${where.join(' AND ')}
       totalSales: ((r['ts'] as num?) ?? 0).toDouble(),
       totalProfit: ((r['tp'] as num?) ?? 0).toDouble(),
     );
+  }
+
+  // ================= SETTLEMENTS =================
+
+  /// ✅ A eshte barazu sot?
+  Future<bool> isWorkerSettledToday(int userId) async {
+    final db = await _open();
+    final today = dayKey(DateTime.now());
+
+    // Prefer: settlements table
+    final rows = await db.query(
+      'settlements',
+      where: 'userId = ? AND dayKey = ?',
+      whereArgs: [userId, today],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  /// ✅ Barazo punëtorin sot:
+  /// - merr totalin e sotëm (unsettled)
+  /// - printon POS80
+  /// - pastaj shënon sales si settled + inserton settlement record
+  Future<void> settleWorkerToday(int userId, String workerName) async {
+    final db = await _open();
+    final today = dayKey(DateTime.now());
+    final now = DateTime.now();
+    final nowMs = now.millisecondsSinceEpoch;
+
+    // 1) check already settled
+    if (await isWorkerSettledToday(userId)) {
+      throw Exception('Punëtori është tashmë i barazuar për sot.');
+    }
+
+    // 2) get today's UNSETTLED sales
+    final stats = await getWorkerStats(userId: userId, scope: 'day');
+    if (stats.totalSales <= 0) {
+      throw Exception('S’ka shitje për sot (ose veç është barazu).');
+    }
+
+    // 3) PRINT first (nese print fails -> mos e sheno settled)
+    String money(double v) => '€${v.toStringAsFixed(2)}';
+    String dtStr() {
+      String pad2(int n) => n.toString().padLeft(2, '0');
+      return '${pad2(now.day)}.${pad2(now.month)}.${now.year} ${pad2(now.hour)}:${pad2(now.minute)}';
+    }
+
+    final lines = <ReceiptLine>[
+      ReceiptLine('BARAZIM PUNETORI', '', bold: true),
+      ReceiptLine('Punetori', workerName, bold: true),
+      ReceiptLine('Data', today),
+      ReceiptLine('Ora', dtStr()),
+      const ReceiptLine('----------------', ''),
+      ReceiptLine('Total Shitje (Sot)', money(stats.totalSales), bold: true),
+      const ReceiptLine('----------------', ''),
+      ReceiptLine('ME I DOREZU PRONARIT', money(stats.totalSales), bold: true),
+      const ReceiptLine('----------------', ''),
+      const ReceiptLine('Faleminderit', ''),
+    ];
+
+    await ReceiptPdf80mm.printOrSave(
+      title: 'SETTLEMENT',
+      lines: lines,
+      jobName: 'settlement-$workerName-$today',
+    );
+
+    // 4) After successful print -> mark settled + insert settlements record
+    await db.transaction((tx) async {
+      // re-check inside transaction for safety
+      final already = await tx.query(
+        'settlements',
+        where: 'userId = ? AND dayKey = ?',
+        whereArgs: [userId, today],
+        limit: 1,
+      );
+      if (already.isNotEmpty) {
+        // someone settled in parallel
+        return;
+      }
+
+      // mark today's sales as settled
+      await tx.update(
+        'sales',
+        {'settledAtMs': nowMs},
+        where:
+            'userId = ? AND dayKey = ? AND revertedAtMs IS NULL AND settledAtMs IS NULL',
+        whereArgs: [userId, today],
+      );
+
+      // insert settlement record
+      await tx.insert('settlements', {
+        'userId': userId,
+        'dayKey': today,
+        'totalSales': round2(stats.totalSales),
+        'settledAtMs': nowMs,
+      });
+    });
   }
 }

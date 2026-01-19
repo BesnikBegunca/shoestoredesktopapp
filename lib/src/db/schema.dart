@@ -1,4 +1,4 @@
-const int kDbVersion = 5;
+const int kDbVersion = 6;
 
 /* ======================= SQL ======================= */
 
@@ -87,5 +87,16 @@ CREATE TABLE IF NOT EXISTS expenses (
   monthKey TEXT NOT NULL,
   createdAtMs INTEGER NOT NULL,
   revertedAtMs INTEGER
+);
+''';
+
+const String kSqlCreateSettlements = '''
+CREATE TABLE IF NOT EXISTS settlements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userId INTEGER NOT NULL,
+  dayKey TEXT NOT NULL,
+  totalSales REAL NOT NULL,
+  settledAtMs INTEGER NOT NULL,
+  UNIQUE(userId, dayKey)
 );
 ''';

@@ -203,8 +203,8 @@ class _LicenseScreenState extends State<LicenseScreen>
         const SnackBar(content: Text('License activated ✅')),
       );
 
-      // Nëse don me u kthy mbrapa në app menjëherë pas aktivizimit, ç’komento:
-      // Navigator.of(context).pop(true);
+      // Pop back to BootGate with success result to allow app usage
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _licenseError = e.toString());

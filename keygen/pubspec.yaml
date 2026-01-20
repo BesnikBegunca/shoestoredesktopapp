@@ -1,9 +1,0 @@
-name: license_keygen
-description: Generate Ed25519 license keys for Shoe Store Manager
-version: 1.0.0
-
-environment:
-  sdk: ^3.0.0
-
-dependencies:
-  cryptography: ^2.7.0

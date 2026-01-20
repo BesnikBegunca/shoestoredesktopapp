@@ -5,7 +5,8 @@ import 'screens/admin_screen.dart';
 import 'screens/main_screen.dart';
 
 class AppRoot extends StatefulWidget {
-  const AppRoot({super.key});
+  final bool readonly;
+  const AppRoot({super.key, this.readonly = false});
 
   @override
   State<AppRoot> createState() => _AppRootState();
@@ -16,7 +17,11 @@ class _AppRootState extends State<AppRoot> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [MainScreen(), ProductsScreen(), AdminScreen()];
+    final pages = [
+      MainScreen(readonly: widget.readonly),
+      ProductsScreen(readonly: widget.readonly),
+      AdminScreen(readonly: widget.readonly),
+    ];
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,

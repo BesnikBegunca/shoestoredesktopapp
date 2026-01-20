@@ -11,6 +11,7 @@ import 'package:shoe_store_manager/auth/role_store.dart';
 import 'package:shoe_store_manager/models/app_user.dart';
 
 import '../local/local_api.dart';
+import '../license/license_service.dart';
 import '../../printing/receipt_builder.dart';
 import '../../printing/receipt_pdf_80mm.dart';
 import '../theme/app_theme.dart';
@@ -21,10 +22,11 @@ String monthKey(DateTime d) =>
 
 enum _ReportScope { day, month, year, total }
 
-enum _AdminTab { dashboard, users }
+enum _AdminTab { dashboard, users, license }
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key});
+  final bool readonly;
+  const AdminScreen({super.key, this.readonly = false});
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -1430,6 +1432,13 @@ class _AdminScreenState extends State<AdminScreen> {
                       }
                     },
                   ),
+                  const SizedBox(height: 8),
+                  _sideBtn(
+                    icon: Icons.key,
+                    label: 'Licence Key Info',
+                    active: tab == _AdminTab.license,
+                    onTap: () => setState(() => tab = _AdminTab.license),
+                  ),
                   const Spacer(),
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
@@ -1457,7 +1466,9 @@ class _AdminScreenState extends State<AdminScreen> {
                     padding: const EdgeInsets.all(18),
                     child: tab == _AdminTab.dashboard
                         ? _dashboardView(s)
-                        : _usersView(),
+                        : tab == _AdminTab.users
+                        ? _usersView()
+                        : _licenseView(),
                   ),
           ),
         ],
@@ -2026,6 +2037,183 @@ class _AdminScreenState extends State<AdminScreen> {
                       );
                     },
                   ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------- LICENSE VIEW ----------
+  Widget _licenseView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Licence Key Info',
+              style: TextStyle(
+                color: AppTheme.text,
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+              ),
+            ),
+            const Spacer(),
+            FutureBuilder<LicenseMode>(
+              future: LicenseService.I.checkStatus(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const SizedBox.shrink();
+                }
+                final mode = snapshot.data!;
+                final color = mode == LicenseMode.active
+                    ? Colors.green
+                    : mode == LicenseMode.expired_readonly
+                    ? Colors.orange
+                    : Colors.red;
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: color.withOpacity(0.35)),
+                  ),
+                  child: Text(
+                    mode == LicenseMode.active
+                        ? 'Active'
+                        : mode == LicenseMode.expired_readonly
+                        ? 'Expired (Read-Only)'
+                        : 'Invalid',
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.stroke),
+            ),
+            child: FutureBuilder<LicenseState?>(
+              future: LicenseService.I.getLicenseState(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data == null) {
+                  return Center(
+                    child: Text(
+                      'No license activated',
+                      style: TextStyle(
+                        color: AppTheme.muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  );
+                }
+                final state = snapshot.data!;
+                final now = DateTime.now().millisecondsSinceEpoch;
+                final daysLeft =
+                    ((state.expiresAt - now) / (24 * 60 * 60 * 1000)).ceil();
+                final activatedDate = DateTime.fromMillisecondsSinceEpoch(
+                  state.activatedAt,
+                );
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.key, size: 64, color: AppTheme.primaryPurple),
+                    const SizedBox(height: 20),
+                    Text(
+                      'License Activated',
+                      style: TextStyle(
+                        color: AppTheme.text,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Activated: ${activatedDate.day}/${activatedDate.month}/${activatedDate.year}',
+                      style: const TextStyle(
+                        color: AppTheme.muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      width: 500,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: daysLeft > 30
+                            ? Colors.green.withOpacity(0.1)
+                            : daysLeft > 7
+                            ? Colors.orange.withOpacity(0.1)
+                            : Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: daysLeft > 30
+                              ? Colors.green
+                              : daysLeft > 7
+                              ? Colors.orange
+                              : Colors.red,
+                          width: 2,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '$daysLeft',
+                            style: TextStyle(
+                              color: daysLeft > 30
+                                  ? Colors.green
+                                  : daysLeft > 7
+                                  ? Colors.orange
+                                  : Colors.red,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 48,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Days Remaining',
+                            style: TextStyle(
+                              color: AppTheme.text,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    if (daysLeft <= 7)
+                      Text(
+                        'License expires soon! Please renew.',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ],

@@ -50,7 +50,8 @@ String formatSizeLabel(int size) {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final bool readonly;
+  const MainScreen({super.key, this.readonly = false});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -174,6 +175,7 @@ class _MainScreenState extends State<MainScreen> {
       barrierDismissible: true,
       builder: (_) => _ProductDialog(
         product: p,
+        readonly: widget.readonly,
         onSold: () async {
           await _search(qC.text);
         },
@@ -202,7 +204,7 @@ class _MainScreenState extends State<MainScreen> {
           if (cart.isNotEmpty)
             IconButton(
               tooltip: 'Shporta (${cart.length})',
-              onPressed: _showCartDialog,
+              onPressed: widget.readonly ? null : _showCartDialog,
               icon: Badge(
                 label: Text(cart.length.toString()),
                 child: const Icon(Icons.shopping_cart),
@@ -229,75 +231,101 @@ class _MainScreenState extends State<MainScreen> {
           const SizedBox(width: 6),
         ],
       ),
-      body: Row(
+      body: Column(
         children: [
-          // Sidebar for workers
-          FutureBuilder<UserRole?>(
-            future: RoleStore.getSessionRole(),
-            builder: (context, snapshot) {
-              if (snapshot.data == UserRole.worker) {
-                return Container(
-                  width: 200,
-                  decoration: BoxDecoration(
-                    color: AppTheme.surface,
-                    border: Border(
-                      right: BorderSide(color: AppTheme.stroke, width: 1),
+          if (widget.readonly)
+            Container(
+              width: double.infinity,
+              color: Colors.orange.shade100,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              child: Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.orange.shade800),
+                  const SizedBox(width: 8),
+                  Text(
+                    'READ-ONLY MODE: License expired. You can view data but cannot make changes.',
+                    style: TextStyle(
+                      color: Colors.orange.shade800,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text(
-                          'Punëtor',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
+                ],
+              ),
+            ),
+          Expanded(
+            child: Row(
+              children: [
+                // Sidebar for workers
+                FutureBuilder<UserRole?>(
+                  future: RoleStore.getSessionRole(),
+                  builder: (context, snapshot) {
+                    if (snapshot.data == UserRole.worker) {
+                      return Container(
+                        width: 200,
+                        decoration: BoxDecoration(
+                          color: AppTheme.surface,
+                          border: Border(
+                            right: BorderSide(color: AppTheme.stroke, width: 1),
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        FilledButton.icon(
-                          onPressed: _barazohu,
-                          icon: const Icon(Icons.assignment_turned_in),
-                          label: const Text('Barazohu'),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                'Punëtor',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              FilledButton.icon(
+                                onPressed: widget.readonly ? null : _barazohu,
+                                icon: const Icon(Icons.assignment_turned_in),
+                                label: const Text('Barazohu'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                // Main content
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        _searchBox(),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: loading
+                              ? const Center(child: CircularProgressIndicator())
+                              : results.isEmpty
+                              ? const Center(child: Text('S’ka rezultate.'))
+                              : GridView.builder(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 4,
+                                        crossAxisSpacing: 12,
+                                        mainAxisSpacing: 12,
+                                        childAspectRatio: 0.9,
+                                      ),
+                                  itemCount: results.length,
+                                  itemBuilder: (_, i) =>
+                                      _productCard(results[i]),
+                                ),
                         ),
                       ],
                     ),
                   ),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-          // Main content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  _searchBox(),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : results.isEmpty
-                        ? const Center(child: Text('S’ka rezultate.'))
-                        : GridView.builder(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 4,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                  childAspectRatio: 0.9,
-                                ),
-                            itemCount: results.length,
-                            itemBuilder: (_, i) => _productCard(results[i]),
-                          ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -865,11 +893,13 @@ class _ProductDialog extends StatefulWidget {
   final Product product;
   final Future<void> Function() onSold;
   final Function(Product, int) onAddToCart;
+  final bool readonly;
 
   const _ProductDialog({
     required this.product,
     required this.onSold,
     required this.onAddToCart,
+    this.readonly = false,
   });
 
   @override
@@ -1110,7 +1140,8 @@ class _ProductDialogState extends State<_ProductDialog> {
                                 foregroundColor: Colors.white,
                               ),
                               onPressed:
-                                  (selling ||
+                                  (widget.readonly ||
+                                      selling ||
                                       !p.active ||
                                       selectedSize == null ||
                                       (selectedSize != null &&

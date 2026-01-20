@@ -10,7 +10,8 @@ import '../local/local_api.dart';
 import '../theme/app_theme.dart';
 
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({super.key});
+  final bool readonly;
+  const ProductsScreen({super.key, this.readonly = false});
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
@@ -89,7 +90,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
       setState(() => _items = list);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gabim: $e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -110,11 +113,23 @@ class _ProductsScreenState extends State<ProductsScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.surface,
         surfaceTintColor: Colors.transparent,
-        title: const Text('Fshij produktin?', style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w900)),
-        content: Text('A je i sigurt me fshi "${p0.name}"?', style: const TextStyle(color: AppTheme.text)),
+        title: const Text(
+          'Fshij produktin?',
+          style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.w900),
+        ),
+        content: Text(
+          'A je i sigurt me fshi "${p0.name}"?',
+          style: const TextStyle(color: AppTheme.text),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Anulo')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Fshije')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Anulo'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Fshije'),
+          ),
         ],
       ),
     );
@@ -124,11 +139,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
     try {
       await LocalApi.I.deleteProduct(p0.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Produkti u fshi.')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Produkti u fshi.')));
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gabim: $e')));
     }
   }
 
@@ -138,7 +157,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gabim: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gabim: $e')));
     }
   }
 
@@ -149,125 +170,156 @@ class _ProductsScreenState extends State<ProductsScreen> {
       appBar: AppBar(
         backgroundColor: AppTheme.surface2,
         foregroundColor: AppTheme.text,
-        title: const Text('Produktet', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const Text(
+          'Produktet',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
         actions: [
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
           const SizedBox(width: 6),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openForm(),
-        label: const Text('Shto'),
-        icon: const Icon(Icons.add),
-      ),
+      floatingActionButton: widget.readonly
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _openForm(),
+              label: const Text('Shto'),
+              icon: const Icon(Icons.add),
+            ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty
-          ? const Center(child: Text('S’ka produkte ende.', style: TextStyle(color: AppTheme.text)))
+          ? const Center(
+              child: Text(
+                'S’ka produkte ende.',
+                style: TextStyle(color: AppTheme.text),
+              ),
+            )
           : ListView.separated(
-        padding: const EdgeInsets.all(12),
-        itemCount: _items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (_, i) {
-          final p0 = _items[i];
-          final hasDisc = p0.discountPercent > 0;
-
-          return Card(
-            color: AppTheme.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: AppTheme.stroke),
-            ),
-            child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  _thumb(p0),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              itemCount: _items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) {
+                final p0 = _items[i];
+                final hasDisc = p0.discountPercent > 0;
+
+                return Card(
+                  color: AppTheme.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: AppTheme.stroke),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
                       children: [
-                        Text(
-                          p0.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            color: AppTheme.text,
+                        _thumb(p0),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                p0.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: AppTheme.text,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                p0.serialNumber ?? p0.sku ?? '—',
+                                style: TextStyle(
+                                  color: AppTheme.muted,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: [
+                                  _pill(
+                                    'Stok: ${p0.stockQty}',
+                                    p0.stockQty > 0 ? Colors.green : Colors.red,
+                                  ),
+                                  _pill(
+                                    p0.active ? 'Active' : 'OFF',
+                                    p0.active ? Colors.green : Colors.grey,
+                                  ),
+                                  if (hasDisc)
+                                    _pill(
+                                      '-${p0.discountPercent.toStringAsFixed(0)}%',
+                                      Colors.orange,
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              _sizesInline(p0), // ✅ shfaq edhe 0-3M...
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          p0.serialNumber ?? p0.sku ?? '—',
-                          style: TextStyle(
-                            color: AppTheme.muted,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            _pill('Stok: ${p0.stockQty}', p0.stockQty > 0 ? Colors.green : Colors.red),
-                            _pill(p0.active ? 'Active' : 'OFF', p0.active ? Colors.green : Colors.grey),
-                            if (hasDisc) _pill('-${p0.discountPercent.toStringAsFixed(0)}%', Colors.orange),
+                            if (hasDisc)
+                              Text(
+                                '€${p0.price.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  color: AppTheme.muted,
+                                  decoration: TextDecoration.lineThrough,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            Text(
+                              '€${p0.finalPrice.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                color: AppTheme.text,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Active',
+                                  onPressed: () => _toggleActive(p0),
+                                  icon: Icon(
+                                    p0.active
+                                        ? Icons.toggle_on
+                                        : Icons.toggle_off,
+                                    color: AppTheme.text,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Edit',
+                                  onPressed: () => _openForm(editing: p0),
+                                  icon: const Icon(
+                                    Icons.edit,
+                                    color: AppTheme.text,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Delete',
+                                  onPressed: () => _confirmDelete(p0),
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: AppTheme.text,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        _sizesInline(p0), // ✅ shfaq edhe 0-3M...
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (hasDisc)
-                        Text(
-                          '€${p0.price.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            color: AppTheme.muted,
-                            decoration: TextDecoration.lineThrough,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      Text(
-                        '€${p0.finalPrice.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: AppTheme.text,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            tooltip: 'Active',
-                            onPressed: () => _toggleActive(p0),
-                            icon: Icon(p0.active ? Icons.toggle_on : Icons.toggle_off, color: AppTheme.text),
-                          ),
-                          IconButton(
-                            tooltip: 'Edit',
-                            onPressed: () => _openForm(editing: p0),
-                            icon: const Icon(Icons.edit, color: AppTheme.text),
-                          ),
-                          IconButton(
-                            tooltip: 'Delete',
-                            onPressed: () => _confirmDelete(p0),
-                            icon: const Icon(Icons.delete_outline, color: AppTheme.text),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
 
@@ -392,15 +444,21 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     skuC = TextEditingController(text: p0?.sku ?? '');
     serialC = TextEditingController(text: p0?.serialNumber ?? '');
     priceC = TextEditingController(text: p0 == null ? '' : p0.price.toString());
-    purchaseC = TextEditingController(text: p0?.purchasePrice?.toString() ?? '');
-    discountC = TextEditingController(text: p0?.discountPercent.toString() ?? '0');
+    purchaseC = TextEditingController(
+      text: p0?.purchasePrice?.toString() ?? '',
+    );
+    discountC = TextEditingController(
+      text: p0?.discountPercent.toString() ?? '0',
+    );
     imagePathC = TextEditingController(text: p0?.imagePath ?? '');
     active = p0?.active ?? true;
 
     final existing = p0?.sizeStock ?? {};
 
     // ✅ nese ka keys 1000+ ose jashtë 17–30, e trajtojmë si TESHA
-    final hasClothLike = existing.keys.any((k) => k >= 1000 || k < minSize || k > maxSize);
+    final hasClothLike = existing.keys.any(
+      (k) => k >= 1000 || k < minSize || k > maxSize,
+    );
     kind = hasClothLike ? ProductKind.clothes : ProductKind.shoes;
 
     sizeCtrls = {
@@ -410,7 +468,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
     clothCtrls = {
       for (int i = 0; i < clothSizes.length; i++)
-        clothSizes[i]: TextEditingController(text: (existing[_clothKey(i)] ?? 0).toString()),
+        clothSizes[i]: TextEditingController(
+          text: (existing[_clothKey(i)] ?? 0).toString(),
+        ),
     };
   }
 
@@ -434,7 +494,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     super.dispose();
   }
 
-  double _parseDouble(String s) => double.tryParse(s.trim().replaceAll(',', '.')) ?? 0;
+  double _parseDouble(String s) =>
+      double.tryParse(s.trim().replaceAll(',', '.')) ?? 0;
   int _parseInt(String s) => int.tryParse(s.trim()) ?? 0;
 
   void _snack(String msg) {
@@ -502,7 +563,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
       // ✅ nese jemi tu editu dhe ka pas foto te app-it, fshije (opsionale)
       final old = imagePathC.text.trim();
-      if (old.isNotEmpty && _looksLikeInsideAppImages(old) && old != storedPath) {
+      if (old.isNotEmpty &&
+          _looksLikeInsideAppImages(old) &&
+          old != storedPath) {
         await _deleteIfAppImage(old);
       }
 
@@ -551,7 +614,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     final sku = skuC.text.trim().isEmpty ? null : skuC.text.trim();
     final serial = serialC.text.trim().isEmpty ? null : serialC.text.trim();
     final price = _parseDouble(priceC.text);
-    final purchase = purchaseC.text.trim().isEmpty ? null : _parseDouble(purchaseC.text);
+    final purchase = purchaseC.text.trim().isEmpty
+        ? null
+        : _parseDouble(purchaseC.text);
     final disc = _parseDouble(discountC.text);
 
     final imgRaw = imagePathC.text.trim();
@@ -623,7 +688,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       } else {
         // nese e ndrron foton, mundesh me fshi te vjetren (vetëm nëse është e app-it)
         final old = (editing.imagePath ?? '').trim();
-        if (old.isNotEmpty && old != (finalImg ?? '') && _looksLikeInsideAppImages(old)) {
+        if (old.isNotEmpty &&
+            old != (finalImg ?? '') &&
+            _looksLikeInsideAppImages(old)) {
           await _deleteIfAppImage(old);
         }
 
@@ -665,7 +732,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       surfaceTintColor: Colors.transparent,
       title: Text(
         isEdit ? 'Ndrysho produkt' : 'Shto produkt',
-        style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.w900),
+        style: const TextStyle(
+          color: AppTheme.text,
+          fontWeight: FontWeight.w900,
+        ),
       ),
       content: SizedBox(
         width: 680,
@@ -681,7 +751,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     labelText: 'Emri i produktit',
                     hintText: 'p.sh. Nike Air Max',
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Shkruje emrin.' : null,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Shkruje emrin.' : null,
                 ),
                 const SizedBox(height: 10),
                 Row(
@@ -690,7 +761,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                       child: TextFormField(
                         controller: skuC,
                         style: const TextStyle(color: AppTheme.text),
-                        decoration: const InputDecoration(labelText: 'SKU (opsionale)'),
+                        decoration: const InputDecoration(
+                          labelText: 'SKU (opsionale)',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -698,7 +771,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                       child: TextFormField(
                         controller: serialC,
                         style: const TextStyle(color: AppTheme.text),
-                        decoration: const InputDecoration(labelText: 'Nr. Serik (opsionale, UNIQUE)'),
+                        decoration: const InputDecoration(
+                          labelText: 'Nr. Serik (opsionale, UNIQUE)',
+                        ),
                       ),
                     ),
                   ],
@@ -710,8 +785,12 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                       child: TextFormField(
                         controller: priceC,
                         style: const TextStyle(color: AppTheme.text),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(labelText: 'Çmimi i shitjes (€)'),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Çmimi i shitjes (€)',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -719,8 +798,12 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                       child: TextFormField(
                         controller: purchaseC,
                         style: const TextStyle(color: AppTheme.text),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(labelText: 'Çmimi i blerjes (€) (ops.)'),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'Çmimi i blerjes (€) (ops.)',
+                        ),
                       ),
                     ),
                   ],
@@ -729,7 +812,9 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 TextFormField(
                   controller: discountC,
                   style: const TextStyle(color: AppTheme.text),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: const InputDecoration(labelText: 'Zbritja (%)'),
                 ),
                 const SizedBox(height: 14),
@@ -743,7 +828,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                         children: [
                           const Text(
                             'Stoku sipas masave',
-                            style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.text),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: AppTheme.text,
+                            ),
                           ),
                           const Spacer(),
                           _totalPill('Total: $totalStock'),
@@ -757,12 +845,14 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                           _kindBtn(
                             label: 'PATIKA',
                             selected: kind == ProductKind.shoes,
-                            onTap: () => setState(() => kind = ProductKind.shoes),
+                            onTap: () =>
+                                setState(() => kind = ProductKind.shoes),
                           ),
                           _kindBtn(
                             label: 'TESHA',
                             selected: kind == ProductKind.clothes,
-                            onTap: () => setState(() => kind = ProductKind.clothes),
+                            onTap: () =>
+                                setState(() => kind = ProductKind.clothes),
                           ),
                         ],
                       ),
@@ -772,7 +862,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
                 const SizedBox(height: 10),
 
-                if (kind == ProductKind.shoes) _sizesGrid() else _clothSizesGrid(),
+                if (kind == ProductKind.shoes)
+                  _sizesGrid()
+                else
+                  _clothSizesGrid(),
 
                 const SizedBox(height: 14),
 
@@ -810,7 +903,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                         child: Image.file(
                           File(imgPath),
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image)),
+                          errorBuilder: (_, __, ___) =>
+                              const Center(child: Icon(Icons.broken_image)),
                         ),
                       ),
                     ),
@@ -820,16 +914,28 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       '⚠️ Foto s’u gjet në këtë path.',
-                      style: TextStyle(color: Colors.orange.shade800, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        color: Colors.orange.shade800,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
 
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Text('Active', style: TextStyle(fontWeight: FontWeight.w800, color: AppTheme.text)),
+                    const Text(
+                      'Active',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.text,
+                      ),
+                    ),
                     const Spacer(),
-                    Switch(value: active, onChanged: (v) => setState(() => active = v)),
+                    Switch(
+                      value: active,
+                      onChanged: (v) => setState(() => active = v),
+                    ),
                   ],
                 ),
               ],
@@ -843,7 +949,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           child: const Text('Anulo'),
         ),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: AppTheme.success, foregroundColor: Colors.white),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppTheme.success,
+            foregroundColor: Colors.white,
+          ),
           onPressed: saving ? null : _save,
           child: Text(saving ? 'Duke ruajt...' : (isEdit ? 'Ruaj' : 'Shto')),
         ),
@@ -863,12 +972,19 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
-          color: selected ? AppTheme.primaryPurple.withOpacity(0.22) : AppTheme.surface2.withOpacity(0.35),
-          border: Border.all(color: selected ? AppTheme.primaryPurple : AppTheme.stroke),
+          color: selected
+              ? AppTheme.primaryPurple.withOpacity(0.22)
+              : AppTheme.surface2.withOpacity(0.35),
+          border: Border.all(
+            color: selected ? AppTheme.primaryPurple : AppTheme.stroke,
+          ),
         ),
         child: Text(
           label,
-          style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.w900),
+          style: const TextStyle(
+            color: AppTheme.text,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
     );
@@ -902,7 +1018,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     width: 34,
                     child: Text(
                       '$size',
-                      style: TextStyle(fontWeight: FontWeight.w900, color: color),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: color,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -962,7 +1081,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     width: 64,
                     child: Text(
                       label,
-                      style: TextStyle(fontWeight: FontWeight.w900, color: color),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: color,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -995,6 +1117,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
       },
     );
   }
+
   Widget _totalPill(String t) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

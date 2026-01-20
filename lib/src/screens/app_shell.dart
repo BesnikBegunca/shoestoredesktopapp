@@ -10,7 +10,8 @@ import 'admin_screen.dart';
 import 'login_screen.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  final bool readonly;
+  const AppShell({super.key, this.readonly = false});
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -54,7 +55,6 @@ class _AppShellState extends State<AppShell> {
                   ),
                 ),
               ),
-
             ],
           ),
         ),
@@ -71,10 +71,7 @@ class _AppShellState extends State<AppShell> {
         decoration: BoxDecoration(
           color: AppTheme.surface2,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: AppTheme.stroke,
-            width: 1,
-          ),
+          border: Border.all(color: AppTheme.stroke, width: 1),
         ),
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -84,20 +81,13 @@ class _AppShellState extends State<AppShell> {
               const SizedBox(height: 6),
               const Text(
                 'Shoe Store',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 20),
 
               _navItem(icon: Icons.point_of_sale, label: 'Shitja', i: 0),
               _navItem(icon: Icons.inventory_2, label: 'Produktet', i: 1),
-              _navItem(
-                icon: Icons.admin_panel_settings,
-                label: 'Admin',
-                i: 2,
-              ),
+              _navItem(icon: Icons.admin_panel_settings, label: 'Admin', i: 2),
               _navItem(icon: Icons.settings, label: 'Settings', i: 3),
 
               const Spacer(),
@@ -140,10 +130,7 @@ class _AppShellState extends State<AppShell> {
           ),
           child: Row(
             children: [
-              Icon(
-                icon,
-                color: active ? AppTheme.primaryPurple : Colors.grey,
-              ),
+              Icon(icon, color: active ? AppTheme.primaryPurple : Colors.grey),
               const SizedBox(width: 10),
               Text(
                 label,
@@ -170,24 +157,19 @@ class _AppShellState extends State<AppShell> {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),
-              (_) => false,
+          (_) => false,
         );
       },
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(14)),
         child: Row(
           children: const [
             Icon(Icons.logout, color: Colors.red),
             SizedBox(width: 10),
             Text(
               'Logout',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: Colors.red,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w800, color: Colors.red),
             ),
           ],
         ),

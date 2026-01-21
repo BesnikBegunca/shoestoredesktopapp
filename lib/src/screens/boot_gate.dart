@@ -3,6 +3,7 @@ import 'package:shoe_store_manager/auth/role_store.dart';
 import 'login_screen.dart';
 import 'main_screen.dart';
 import 'app_shell.dart';
+import 'superadmin_screen.dart';
 
 class BootGate extends StatefulWidget {
   const BootGate({super.key});
@@ -31,7 +32,12 @@ class _BootGateState extends State<BootGate> {
       return;
     }
 
-    if (role == UserRole.worker) {
+    if (role == UserRole.superadmin) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const SuperAdminScreen()),
+      );
+    } else if (role == UserRole.worker) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const MainScreen()),

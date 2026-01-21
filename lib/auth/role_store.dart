@@ -1,6 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum UserRole { admin, worker }
+enum UserRole { superadmin, admin, worker }
 
 class RoleStore {
   RoleStore._();
@@ -22,12 +22,26 @@ class RoleStore {
     final sp = await SharedPreferences.getInstance();
     final v = sp.getString(_kRole);
     if (v == null) return null;
-    return v == 'admin' ? UserRole.admin : UserRole.worker;
+    if (v == 'superadmin') return UserRole.superadmin;
+    if (v == 'admin') return UserRole.admin;
+    return UserRole.worker;
   }
 
   static Future<void> setRole(UserRole role) async {
     final sp = await SharedPreferences.getInstance();
-    await sp.setString(_kRole, role == UserRole.admin ? 'admin' : 'worker');
+    String roleStr;
+    switch (role) {
+      case UserRole.superadmin:
+        roleStr = 'superadmin';
+        break;
+      case UserRole.admin:
+        roleStr = 'admin';
+        break;
+      case UserRole.worker:
+        roleStr = 'worker';
+        break;
+    }
+    await sp.setString(_kRole, roleStr);
   }
 
   // ---------------- SESSION (recommended) ----------------
@@ -40,7 +54,19 @@ class RoleStore {
     await sp.setInt(_kUserId, userId);
     await sp.setString(_kUsername, username.trim());
     // keep role in same key for compatibility
-    await sp.setString(_kRole, role == UserRole.admin ? 'admin' : 'worker');
+    String roleStr;
+    switch (role) {
+      case UserRole.superadmin:
+        roleStr = 'superadmin';
+        break;
+      case UserRole.admin:
+        roleStr = 'admin';
+        break;
+      case UserRole.worker:
+        roleStr = 'worker';
+        break;
+    }
+    await sp.setString(_kRole, roleStr);
   }
 
   /// ✅ returns nullable for cases where you want to check explicitly
@@ -68,7 +94,9 @@ class RoleStore {
     final sp = await SharedPreferences.getInstance();
     final v = sp.getString(_kRole);
     if (v == null) return null;
-    return v == 'admin' ? UserRole.admin : UserRole.worker;
+    if (v == 'superadmin') return UserRole.superadmin;
+    if (v == 'admin') return UserRole.admin;
+    return UserRole.worker;
   }
 
   /// ✅ handy helpers

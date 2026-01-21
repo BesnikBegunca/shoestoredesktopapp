@@ -3,6 +3,7 @@ import 'package:shoe_store_manager/auth/role_store.dart';
 import '../local/local_api.dart';
 import 'main_screen.dart';
 import 'app_shell.dart';
+import 'superadmin_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -71,8 +72,14 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final res = await LocalApi.I.login(username: u, password: p);
 
-      final role =
-      res.role == 'admin' ? UserRole.admin : UserRole.worker;
+      UserRole role;
+      if (res.role == 'superadmin') {
+        role = UserRole.superadmin;
+      } else if (res.role == 'admin') {
+        role = UserRole.admin;
+      } else {
+        role = UserRole.worker;
+      }
 
       await RoleStore.setSession(
         userId: res.id,
@@ -82,7 +89,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      if (role == UserRole.worker) {
+      if (role == UserRole.superadmin) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const SuperAdminScreen()),
+        );
+      } else if (role == UserRole.worker) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const MainScreen()),

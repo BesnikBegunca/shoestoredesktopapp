@@ -570,7 +570,7 @@ class LocalApi {
     final now = DateTime.now().millisecondsSinceEpoch;
     await db.insert('users', {
       'username': 'admin',
-      'password': '1234',
+      'password': '123123',
       'role': 'admin',
       'active': 1,
       'createdAtMs': now,

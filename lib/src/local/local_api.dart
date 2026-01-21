@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shoe_store_manager/models/app_user.dart';
+import 'package:shoe_store_manager/models/business.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../printing/receipt_pdf_80mm.dart';
@@ -12,7 +13,7 @@ import '../../printing/receipt_preview.dart';
 
 /// ✅ DB VERSION
 /// IMPORTANT: Kur shton tabela/kolona, rrite version-in
-const int kDbVersion = 8;
+const int kDbVersion = 10;
 
 /* ======================= SQL ======================= */
 
@@ -21,9 +22,10 @@ CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL UNIQUE,
   password TEXT NOT NULL,
-  role TEXT NOT NULL,               -- 'admin' | 'worker'
+  role TEXT NOT NULL,               -- 'superadmin' | 'admin' | 'worker'
   active INTEGER NOT NULL DEFAULT 1,
-  createdAtMs INTEGER NOT NULL
+  createdAtMs INTEGER NOT NULL,
+  businessId INTEGER                -- nullable - NULL për superadmin, ID e biznesit për user-at e biznesit
 );
 ''';
 
@@ -116,6 +118,29 @@ CREATE TABLE IF NOT EXISTS settlements (
   totalSales REAL NOT NULL,
   settledAtMs INTEGER NOT NULL,
   UNIQUE(userId, dayKey)
+);
+''';
+
+/// ✅ NEW: businesses table
+const String kSqlCreateBusinesses = '''
+CREATE TABLE IF NOT EXISTS businesses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  password TEXT NOT NULL,
+  address TEXT,
+  city TEXT,
+  postalCode TEXT,
+  phone TEXT,
+  email TEXT,
+  ownerName TEXT,
+  taxId TEXT,
+  registrationNumber TEXT,
+  contactPerson TEXT,
+  website TEXT,
+  notes TEXT,
+  createdByUserId INTEGER NOT NULL,
+  createdAtMs INTEGER NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1
 );
 ''';
 
@@ -454,7 +479,8 @@ class LocalApi {
         await d.execute(kSqlCreateSaleItems);
         await d.execute(kSqlCreateInvestments);
         await d.execute(kSqlCreateExpenses);
-        await d.execute(kSqlCreateSettlements); // ✅ NEW
+        await d.execute(kSqlCreateSettlements);
+        await d.execute(kSqlCreateBusinesses); // ✅ NEW
       },
       onUpgrade: (d, oldV, newV) async {
         // ensure tables exist
@@ -464,7 +490,8 @@ class LocalApi {
         await d.execute(kSqlCreateSaleItems);
         await d.execute(kSqlCreateInvestments);
         await d.execute(kSqlCreateExpenses);
-        await d.execute(kSqlCreateSettlements); // ✅ NEW
+        await d.execute(kSqlCreateSettlements);
+        await d.execute(kSqlCreateBusinesses); // ✅ NEW
 
         // columns for old dbs
         await _tryAddColumn(
@@ -488,7 +515,7 @@ class LocalApi {
           d,
           table: 'sales',
           columnSql: 'settledAtMs INTEGER',
-        ); // ✅ NEW
+        );
 
         await _tryAddColumn(
           d,
@@ -501,6 +528,25 @@ class LocalApi {
           columnSql: 'revertedAtMs INTEGER',
         );
         await _tryAddColumn(d, table: 'expenses', columnSql: 'userId INTEGER');
+
+        // ✅ NEW: migration për version 9
+        if (oldV < 9) {
+          await _tryAddColumn(
+            d,
+            table: 'users',
+            columnSql: 'businessId INTEGER',
+          );
+        }
+        // ✅ NEW: migration për version 10 - shto kolona të reja për businesses
+        if (oldV < 10) {
+          await _tryAddColumn(d, table: 'businesses', columnSql: 'city TEXT');
+          await _tryAddColumn(d, table: 'businesses', columnSql: 'postalCode TEXT');
+          await _tryAddColumn(d, table: 'businesses', columnSql: 'ownerName TEXT');
+          await _tryAddColumn(d, table: 'businesses', columnSql: 'taxId TEXT');
+          await _tryAddColumn(d, table: 'businesses', columnSql: 'registrationNumber TEXT');
+          await _tryAddColumn(d, table: 'businesses', columnSql: 'contactPerson TEXT');
+          await _tryAddColumn(d, table: 'businesses', columnSql: 'website TEXT');
+        }
       },
       onOpen: (d) async {
         await d.execute(kSqlCreateUsers);
@@ -509,7 +555,8 @@ class LocalApi {
         await d.execute(kSqlCreateSaleItems);
         await d.execute(kSqlCreateInvestments);
         await d.execute(kSqlCreateExpenses);
-        await d.execute(kSqlCreateSettlements); // ✅ NEW
+        await d.execute(kSqlCreateSettlements);
+        await d.execute(kSqlCreateBusinesses); // ✅ NEW
 
         await _tryAddColumn(
           d,
@@ -532,7 +579,7 @@ class LocalApi {
           d,
           table: 'sales',
           columnSql: 'settledAtMs INTEGER',
-        ); // ✅ NEW
+        );
 
         await _tryAddColumn(
           d,
@@ -545,6 +592,21 @@ class LocalApi {
           columnSql: 'revertedAtMs INTEGER',
         );
         await _tryAddColumn(d, table: 'expenses', columnSql: 'userId INTEGER');
+
+        // ✅ NEW: ensure businessId column exists
+        await _tryAddColumn(
+          d,
+          table: 'users',
+          columnSql: 'businessId INTEGER',
+        );
+        // ✅ NEW: ensure new business columns exist
+        await _tryAddColumn(d, table: 'businesses', columnSql: 'city TEXT');
+        await _tryAddColumn(d, table: 'businesses', columnSql: 'postalCode TEXT');
+        await _tryAddColumn(d, table: 'businesses', columnSql: 'ownerName TEXT');
+        await _tryAddColumn(d, table: 'businesses', columnSql: 'taxId TEXT');
+        await _tryAddColumn(d, table: 'businesses', columnSql: 'registrationNumber TEXT');
+        await _tryAddColumn(d, table: 'businesses', columnSql: 'contactPerson TEXT');
+        await _tryAddColumn(d, table: 'businesses', columnSql: 'website TEXT');
       },
     );
 
@@ -562,19 +624,72 @@ class LocalApi {
 
   Future<void> ensureDefaultAdmin() async {
     final db = await _open();
-    final rows = await db.rawQuery(
-      "SELECT id FROM users WHERE role='admin' LIMIT 1",
+    // ✅ Kontrollo nëse ka superadmin me username 'superadmin'
+    final superadminRows = await db.rawQuery(
+      "SELECT id FROM users WHERE username='superadmin' AND role='superadmin' LIMIT 1",
     );
-    if (rows.isNotEmpty) return;
+    if (superadminRows.isNotEmpty) {
+      // ✅ Sigurohu që password është '123123'
+      await db.update(
+        'users',
+        {'password': '123123'},
+        where: 'username = ? AND role = ?',
+        whereArgs: ['superadmin', 'superadmin'],
+      );
+      return;
+    }
 
+    // ✅ Kontrollo nëse ka admin ekzistues me username 'admin' (për migrim)
+    final adminRows = await db.rawQuery(
+      "SELECT id FROM users WHERE username='admin' LIMIT 1",
+    );
+    
+    if (adminRows.isNotEmpty) {
+      // ✅ Konverto admin ekzistues në superadmin
+      final adminId = adminRows.first['id'] as int;
+      await db.update(
+        'users',
+        {
+          'username': 'superadmin',
+          'password': '123123',
+          'role': 'superadmin',
+          'businessId': null,
+        },
+        where: 'id = ?',
+        whereArgs: [adminId],
+      );
+      return;
+    }
+
+    // ✅ Krijo superadmin i ri
     final now = DateTime.now().millisecondsSinceEpoch;
-    await db.insert('users', {
-      'username': 'admin',
-      'password': '123123',
-      'role': 'admin',
-      'active': 1,
-      'createdAtMs': now,
-    });
+    try {
+      await db.insert('users', {
+        'username': 'superadmin',
+        'password': '123123',
+        'role': 'superadmin',
+        'active': 1,
+        'createdAtMs': now,
+        'businessId': null,
+      });
+    } catch (e) {
+      // Nëse username 'superadmin' ekziston tashmë, përditëso atë
+      if (e.toString().contains('UNIQUE constraint')) {
+        await db.update(
+          'users',
+          {
+            'password': '123123',
+            'role': 'superadmin',
+            'businessId': null,
+            'active': 1,
+          },
+          where: 'username = ?',
+          whereArgs: ['superadmin'],
+        );
+      } else {
+        rethrow;
+      }
+    }
   }
 
   Future<AppUser> login({
@@ -584,15 +699,37 @@ class LocalApi {
     final db = await _open();
     final u = username.trim();
     final p0 = password;
-    if (u.isEmpty) throw Exception('Shkruaj username.');
+    if (u.isEmpty) throw Exception('Shkruaj username ose email.');
     if (p0.isEmpty) throw Exception('Shkruaj password.');
 
-    final rows = await db.query(
+    // ✅ Provo fillimisht me username
+    var rows = await db.query(
       'users',
       where: 'username = ? AND password = ? AND active = 1',
       whereArgs: [u, p0],
       limit: 1,
     );
+
+    // ✅ Nëse nuk gjet me username, provo me email nga businesses
+    if (rows.isEmpty) {
+      final businessRows = await db.query(
+        'businesses',
+        where: 'email = ? AND password = ? AND active = 1',
+        whereArgs: [u, p0],
+        limit: 1,
+      );
+      
+      if (businessRows.isNotEmpty) {
+        final businessId = businessRows.first['id'] as int;
+        // ✅ Gjej user-in e biznesit
+        rows = await db.query(
+          'users',
+          where: 'businessId = ? AND role = ? AND active = 1',
+          whereArgs: [businessId, 'admin'],
+          limit: 1,
+        );
+      }
+    }
 
     if (rows.isEmpty) {
       throw Exception('User nuk ekziston ose password gabim.');
@@ -620,12 +757,15 @@ class LocalApi {
     required String username,
     required String password,
     required String role,
+    int? businessId,
   }) async {
     final db = await _open();
     final u = username.trim();
     if (u.isEmpty) throw Exception('Username i zbrazët.');
     if (password.isEmpty) throw Exception('Password i zbrazët.');
-    if (role != 'worker' && role != 'admin') throw Exception('Role invalid.');
+    if (role != 'worker' && role != 'admin' && role != 'superadmin') {
+      throw Exception('Role invalid.');
+    }
 
     final now = DateTime.now().millisecondsSinceEpoch;
 
@@ -636,6 +776,7 @@ class LocalApi {
         'role': role,
         'active': 1,
         'createdAtMs': now,
+        'businessId': businessId,
       });
     } catch (_) {
       throw Exception('Username ekziston already.');
@@ -647,16 +788,20 @@ class LocalApi {
     required String username,
     String? password,
     required String role,
+    int? businessId,
   }) async {
     final db = await _open();
     final u = username.trim();
     final r = role.trim();
     if (u.isEmpty) throw Exception('Username i zbrazët.');
-    if (r != 'worker' && r != 'admin') throw Exception('Role invalid.');
+    if (r != 'worker' && r != 'admin' && r != 'superadmin') {
+      throw Exception('Role invalid.');
+    }
 
     final data = <String, Object?>{'username': u, 'role': r};
     final p0 = password?.trim();
     if (p0 != null && p0.isNotEmpty) data['password'] = p0;
+    if (businessId != null) data['businessId'] = businessId;
 
     try {
       await db.update('users', data, where: 'id = ?', whereArgs: [userId]);
@@ -690,6 +835,179 @@ class LocalApi {
     );
     if (rows.isEmpty) return null;
     return AppUser.fromRow(rows.first);
+  }
+
+  // ================= BUSINESSES =================
+
+  Future<int> createBusiness({
+    required String name,
+    required String password,
+    String? address,
+    String? city,
+    String? postalCode,
+    String? phone,
+    String? email,
+    String? ownerName,
+    String? taxId,
+    String? registrationNumber,
+    String? contactPerson,
+    String? website,
+    String? notes,
+    required int createdByUserId,
+  }) async {
+    final db = await _open();
+    final n = name.trim();
+    if (n.isEmpty) throw Exception('Emri i biznesit i zbrazët.');
+    if (password.isEmpty) throw Exception('Password i zbrazët.');
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    try {
+      final businessId = await db.insert('businesses', {
+        'name': n,
+        'password': password,
+        'address': address?.trim(),
+        'city': city?.trim(),
+        'postalCode': postalCode?.trim(),
+        'phone': phone?.trim(),
+        'email': email?.trim(),
+        'ownerName': ownerName?.trim(),
+        'taxId': taxId?.trim(),
+        'registrationNumber': registrationNumber?.trim(),
+        'contactPerson': contactPerson?.trim(),
+        'website': website?.trim(),
+        'notes': notes?.trim(),
+        'createdByUserId': createdByUserId,
+        'createdAtMs': now,
+        'active': 1,
+      });
+
+      // ✅ Automatikisht krijo user për biznesin
+      // Përdor email si username nëse ka, përndryshe përdor emrin e biznesit
+      final usernameForUser = email?.trim().isNotEmpty == true ? email!.trim() : n;
+      await db.insert('users', {
+        'username': usernameForUser,
+        'password': password,
+        'role': 'admin',
+        'active': 1,
+        'createdAtMs': now,
+        'businessId': businessId,
+      });
+
+      return businessId;
+    } catch (e) {
+      if (e.toString().contains('UNIQUE constraint')) {
+        throw Exception('Emri i biznesit ekziston already.');
+      }
+      rethrow;
+    }
+  }
+
+  Future<List<Business>> getBusinesses({required int createdByUserId}) async {
+    final db = await _open();
+    final rows = await db.query(
+      'businesses',
+      where: 'createdByUserId = ?',
+      whereArgs: [createdByUserId],
+      orderBy: 'createdAtMs DESC',
+    );
+    return rows.map(Business.fromRow).toList();
+  }
+
+  Future<Business?> getBusinessById(int businessId) async {
+    final db = await _open();
+    final rows = await db.query(
+      'businesses',
+      where: 'id = ?',
+      whereArgs: [businessId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return Business.fromRow(rows.first);
+  }
+
+  Future<void> updateBusiness({
+    required int businessId,
+    required String name,
+    String? password,
+    String? address,
+    String? city,
+    String? postalCode,
+    String? phone,
+    String? email,
+    String? ownerName,
+    String? taxId,
+    String? registrationNumber,
+    String? contactPerson,
+    String? website,
+    String? notes,
+  }) async {
+    final db = await _open();
+    final n = name.trim();
+    if (n.isEmpty) throw Exception('Emri i biznesit i zbrazët.');
+
+    final data = <String, Object?>{'name': n};
+    if (password != null && password.isNotEmpty) {
+      data['password'] = password;
+    }
+    if (address != null) data['address'] = address.trim().isEmpty ? null : address.trim();
+    if (city != null) data['city'] = city.trim().isEmpty ? null : city.trim();
+    if (postalCode != null) data['postalCode'] = postalCode.trim().isEmpty ? null : postalCode.trim();
+    if (phone != null) data['phone'] = phone.trim().isEmpty ? null : phone.trim();
+    if (email != null) data['email'] = email.trim().isEmpty ? null : email.trim();
+    if (ownerName != null) data['ownerName'] = ownerName.trim().isEmpty ? null : ownerName.trim();
+    if (taxId != null) data['taxId'] = taxId.trim().isEmpty ? null : taxId.trim();
+    if (registrationNumber != null) data['registrationNumber'] = registrationNumber.trim().isEmpty ? null : registrationNumber.trim();
+    if (contactPerson != null) data['contactPerson'] = contactPerson.trim().isEmpty ? null : contactPerson.trim();
+    if (website != null) data['website'] = website.trim().isEmpty ? null : website.trim();
+    if (notes != null) data['notes'] = notes.trim().isEmpty ? null : notes.trim();
+
+    try {
+      await db.update('businesses', data, where: 'id = ?', whereArgs: [businessId]);
+
+      // ✅ Nëse password u ndryshua, përditëso edhe user-in e biznesit
+      if (password != null && password.isNotEmpty) {
+        final business = await getBusinessById(businessId);
+        if (business != null) {
+          await db.update(
+            'users',
+            {'password': password},
+            where: 'businessId = ? AND role = ?',
+            whereArgs: [businessId, 'admin'],
+          );
+        }
+      }
+    } catch (e) {
+      if (e.toString().contains('UNIQUE constraint')) {
+        throw Exception('Emri i biznesit ekziston already.');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> deleteBusiness(int businessId) async {
+    final db = await _open();
+    // ✅ Fshi edhe user-at e biznesit
+    await db.delete('users', where: 'businessId = ?', whereArgs: [businessId]);
+    // ✅ Fshi biznesin
+    await db.delete('businesses', where: 'id = ?', whereArgs: [businessId]);
+  }
+
+  Future<void> setBusinessActive(int businessId, bool active) async {
+    final db = await _open();
+    await db.update(
+      'businesses',
+      {'active': active ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [businessId],
+    );
+    // ✅ Deaktivizo edhe user-at e biznesit
+    await db.update(
+      'users',
+      {'active': active ? 1 : 0},
+      where: 'businessId = ?',
+      whereArgs: [businessId],
+    );
   }
 
   // ================= PRODUCTS =================

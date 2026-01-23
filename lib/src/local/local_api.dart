@@ -2388,6 +2388,49 @@ WHERE ${where.join(' AND ')}
         .toList();
   }
 
+  Future<List<Map<String, dynamic>>> getSalesChartData({int days = 7}) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+
+    final now = DateTime.now();
+    final from = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: days - 1));
+    final fromMs = from.millisecondsSinceEpoch;
+
+    final rows = await db.rawQuery(
+      '''
+    SELECT
+      strftime('%Y-%m-%d', (createdAtMs / 1000), 'unixepoch') AS dayKey,
+      COALESCE(SUM(total), 0) AS total
+    FROM sales
+    WHERE createdAtMs >= ? AND revertedAtMs IS NULL
+    GROUP BY dayKey
+    ORDER BY dayKey ASC
+    ''',
+      [fromMs],
+    );
+
+    // map ditë -> total
+    final byDay = <String, double>{
+      for (final r in rows)
+        (r['dayKey'] as String): ((r['total'] as num?)?.toDouble() ?? 0.0),
+    };
+
+    // mbush edhe ditët që s’kanë shitje me 0 (që chart mos lëviz)
+    final out = <Map<String, dynamic>>[];
+    for (int i = 0; i < days; i++) {
+      final d = from.add(Duration(days: i));
+      final key =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      out.add({'dayKey': key, 'total': byDay[key] ?? 0.0});
+    }
+
+    return out;
+  }
+
   /// Get recent sales for payments list
   Future<List<Map<String, dynamic>>> getRecentSales({int limit = 5}) async {
     final db = await DatabaseManager.getCurrentBusinessDb();

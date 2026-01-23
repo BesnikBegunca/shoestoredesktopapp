@@ -199,9 +199,9 @@ class _LicenseScreenState extends State<LicenseScreen>
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('License activated ✅')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('License activated ✅')));
 
       // Nëse don me u kthy mbrapa në app menjëherë pas aktivizimit, ç’komento:
       // Navigator.of(context).pop(true);
@@ -218,9 +218,9 @@ class _LicenseScreenState extends State<LicenseScreen>
     await _refresh();
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('License cleared')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('License cleared')));
   }
 
   void _loginDeveloper() {
@@ -249,14 +249,18 @@ class _LicenseScreenState extends State<LicenseScreen>
     setState(() => _generateLoading = true);
 
     try {
-      final key = await LicenseService.I.generateLicenseKey(customerId);
+      final key = await LicenseService.I.generateLicenseKey(
+        customerId,
+        validDays: 365,
+      );
+
       if (!mounted) return;
       setState(() => _generatedKey = key);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating license: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error generating license: $e')));
     } finally {
       if (mounted) setState(() => _generateLoading = false);
     }
@@ -306,8 +310,11 @@ class _LicenseScreenState extends State<LicenseScreen>
                     _statusCard(),
                     const SizedBox(height: 24),
 
-                    const Icon(Icons.lock_outline,
-                        size: 80, color: AppTheme.text),
+                    const Icon(
+                      Icons.lock_outline,
+                      size: 80,
+                      color: AppTheme.text,
+                    ),
                     const SizedBox(height: 24),
                     const Text(
                       'Enter License Key',
@@ -410,8 +417,10 @@ class _LicenseScreenState extends State<LicenseScreen>
                       ),
                       const SizedBox(height: 16),
                       if (_devError != null)
-                        Text(_devError!,
-                            style: const TextStyle(color: Colors.red)),
+                        Text(
+                          _devError!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
                       const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
@@ -454,7 +463,8 @@ class _LicenseScreenState extends State<LicenseScreen>
                                   height: 20,
                                   width: 20,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2),
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Text('Generate License'),
                         ),

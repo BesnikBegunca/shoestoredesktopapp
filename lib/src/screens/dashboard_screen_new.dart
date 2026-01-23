@@ -30,15 +30,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _loading = true);
     try {
       final monthOptions = await LocalApi.I.getMonthOptions();
-      final currentMonth = monthOptions.isNotEmpty ? monthOptions.first : _monthKey(DateTime.now());
-      
+      final currentMonth = monthOptions.isNotEmpty
+          ? monthOptions.first
+          : _monthKey(DateTime.now());
+
       final stats = await LocalApi.I.getAdminStats(selectedMonth: currentMonth);
       final salesData = await LocalApi.I.getSalesChartData(days: 7);
       final recent = await LocalApi.I.getRecentSales(limit: 5);
       final products = await LocalApi.I.getProducts();
-      
+
       final lowStock = products.where((p) => p.stockQty < 5).length;
-      
+
       if (!mounted) return;
       setState(() {
         _stats = stats;
@@ -116,9 +118,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         // Stats Cards
                         if (_stats != null) _buildStatsCards(_stats!),
-                        
+
                         const SizedBox(height: 24),
-                        
+
                         // Charts and Tables Row
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -134,9 +136,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ],
                               ),
                             ),
-                            
+
                             const SizedBox(width: 24),
-                            
+
                             // Right Column - Quick Info
                             Expanded(
                               flex: 1,
@@ -247,7 +249,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const Spacer(),
               if (trend.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -318,7 +323,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.blue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -335,7 +343,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          
+
           SizedBox(
             height: 250,
             child: _dailySalesData.isEmpty
@@ -353,8 +361,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         enabled: true,
                         touchTooltipData: BarTouchTooltipData(
                           getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                            final date = _dailySalesData[groupIndex]['dayKey'] ?? '';
-                            final total = _dailySalesData[groupIndex]['total'] ?? 0.0;
+                            final date =
+                                _dailySalesData[groupIndex]['dayKey'] ?? '';
+                            final total =
+                                _dailySalesData[groupIndex]['total'] ?? 0.0;
                             return BarTooltipItem(
                               '$date\n${_formatCurrency(total)}',
                               const TextStyle(
@@ -367,15 +377,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       titlesData: FlTitlesData(
                         show: true,
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
                             getTitlesWidget: (value, meta) {
                               final index = value.toInt();
-                              if (index >= 0 && index < _dailySalesData.length) {
-                                final dayKey = _dailySalesData[index]['dayKey'] ?? '';
+                              if (index >= 0 &&
+                                  index < _dailySalesData.length) {
+                                final dayKey =
+                                    _dailySalesData[index]['dayKey'] ?? '';
                                 final parts = dayKey.split('-');
                                 if (parts.length >= 3) {
                                   return Padding(
@@ -415,32 +431,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       gridData: FlGridData(
                         show: true,
                         drawVerticalLine: false,
-                        getDrawingHorizontalLine: (value) => FlLine(
-                          color: AppTheme.stroke,
-                          strokeWidth: 1,
-                        ),
+                        getDrawingHorizontalLine: (value) =>
+                            FlLine(color: AppTheme.stroke, strokeWidth: 1),
                       ),
                       borderData: FlBorderData(show: false),
-                      barGroups: List.generate(
-                        _dailySalesData.length,
-                        (index) {
-                          final total = (_dailySalesData[index]['total'] as num?)?.toDouble() ?? 0.0;
-                          return BarChartGroupData(
-                            x: index,
-                            barRods: [
-                              BarChartRodData(
-                                toY: total,
-                                color: Colors.blue.shade700,
-                                width: 16,
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(6),
-                                  topRight: Radius.circular(6),
-                                ),
+                      barGroups: List.generate(_dailySalesData.length, (index) {
+                        final total =
+                            (_dailySalesData[index]['total'] as num?)
+                                ?.toDouble() ??
+                            0.0;
+                        return BarChartGroupData(
+                          x: index,
+                          barRods: [
+                            BarChartRodData(
+                              toY: total,
+                              color: Colors.blue.shade700,
+                              width: 16,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(6),
+                                topRight: Radius.circular(6),
                               ),
-                            ],
-                          );
-                        },
-                      ),
+                            ),
+                          ],
+                        );
+                      }),
                     ),
                   ),
           ),
@@ -451,7 +465,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   double _getMaxY() {
     if (_dailySalesData.isEmpty) return 1000;
-    final maxValue = _dailySalesData.map((d) => (d['total'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a > b ? a : b);
+    final maxValue = _dailySalesData
+        .map((d) => (d['total'] as num?)?.toDouble() ?? 0.0)
+        .reduce((a, b) => a > b ? a : b);
     return (maxValue * 1.2).ceilToDouble();
   }
 
@@ -475,11 +491,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           if (_stats != null) ...[
-            _financialRow('Shitje Totale', _stats!.totalSalesMonth, Colors.blue),
+            _financialRow(
+              'Shitje Totale',
+              _stats!.totalSalesMonth,
+              Colors.blue,
+            ),
             const SizedBox(height: 12),
-            _financialRow('Fitimi Bruto', _stats!.totalProfitMonth, Colors.green),
+            _financialRow(
+              'Fitimi Bruto',
+              _stats!.totalProfitMonth,
+              Colors.green,
+            ),
             const SizedBox(height: 12),
             _financialRow('Shpenzime', _stats!.totalExpensesMonth, Colors.red),
             const Divider(height: 32),
@@ -495,7 +519,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _financialRow(String label, double amount, Color color, {bool isLarge = false}) {
+  Widget _financialRow(
+    String label,
+    double amount,
+    Color color, {
+    bool isLarge = false,
+  }) {
     return Row(
       children: [
         Container(
@@ -549,7 +578,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          
+
           _quickStatRow(
             'Produkte Totale',
             _productCount.toString(),
@@ -629,7 +658,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           if (_recentSales.isEmpty)
             Center(
               child: Padding(

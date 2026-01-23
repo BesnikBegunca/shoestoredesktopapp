@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shoe_store_manager/auth/role_store.dart';
 import '../local/local_api.dart';
+import '../theme/app_theme.dart';
+import '../db/database_manager.dart';
+import '../license/license_checker.dart';
 import 'main_screen.dart';
 import 'app_shell.dart';
 import 'superadmin_screen.dart';
+import 'developer_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -81,29 +85,79 @@ class _LoginScreenState extends State<LoginScreen> {
         role = UserRole.worker;
       }
 
+      // ✅ Ruaj session me businessId
       await RoleStore.setSession(
         userId: res.id,
         username: res.username,
         role: role,
+        businessId: res.businessId,
       );
 
       if (!mounted) return;
 
+      // ✅ Superadmin -> Developer Panel
       if (role == UserRole.superadmin) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const SuperAdminScreen()),
+          MaterialPageRoute(builder: (_) => const DeveloperScreen()),
         );
-      } else if (role == UserRole.worker) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainScreen()),
-        );
+        return;
+      }
+
+      // ✅ Business users -> switch to business DB dhe kontrollo licensën
+      if (res.businessId != null) {
+        // Switch to business database
+        await DatabaseManager.switchToBusiness(res.businessId!);
+        
+        // Kontrollo licensën
+        final licenseValid = await LicenseChecker.isBusinessLicenseValid(res.businessId!);
+        
+        if (!licenseValid) {
+          // Licensa e skaduar -> shfaq warning dhe blloko aksesin
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => AlertDialog(
+              title: const Text(
+                'Licensa e Skaduar',
+                style: TextStyle(fontWeight: FontWeight.w900, color: Colors.red),
+              ),
+              content: const Text(
+                'Licensa e këtij biznesi ka skaduar. Ju lutem kontaktoni administratorin për të rinovuar licensën.',
+                style: TextStyle(fontSize: 16),
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    // Kthehu në login screen
+                    RoleStore.clear();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+        
+        // Licensa valide -> vazhdo në app
+        if (!mounted) return;
+        if (role == UserRole.worker) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MainScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AppShell()),
+          );
+        }
       } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const AppShell()),
-        );
+        // User pa businessId (nuk duhet të ndodhë)
+        _showError('User configuration error.');
       }
     } catch (e) {
       _showError(e.toString());
@@ -115,8 +169,12 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.bg,
       appBar: AppBar(title: const Text('Login')),
-      body: Center(
+      body: SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 460),
           child: Card(
@@ -214,6 +272,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

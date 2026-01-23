@@ -17,6 +17,7 @@ class SuperAdminScreen extends StatefulWidget {
 class _SuperAdminScreenState extends State<SuperAdminScreen> {
   bool loading = false;
   List<Business> businesses = [];
+  Map<int, Map<String, int>> businessStats = {}; // businessId -> {products, users, sales}
 
   @override
   void initState() {
@@ -30,7 +31,28 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
       final userId = await RoleStore.getUserId();
       final list = await LocalApi.I.getBusinesses(createdByUserId: userId);
       if (!mounted) return;
-      setState(() => businesses = list);
+      
+      // Load stats for each business
+      final stats = <int, Map<String, int>>{};
+      final allUsers = await LocalApi.I.getAllUsers();
+      
+      for (final b in list) {
+        try {
+          final businessUsers = allUsers.where((u) => u.businessId == b.id).toList();
+          stats[b.id] = {
+            'products': 0, // TODO: Filter products by business
+            'users': businessUsers.length,
+            'sales': 0, // Placeholder for now
+          };
+        } catch (e) {
+          stats[b.id] = {'products': 0, 'users': 0, 'sales': 0};
+        }
+      }
+      
+      setState(() {
+        businesses = list;
+        businessStats = stats;
+      });
     } catch (e) {
       if (!mounted) return;
       _showError('Gabim: $e');
@@ -646,24 +668,66 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'SUPER ADMIN',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                      color: AppTheme.text,
-                      letterSpacing: 0.5,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryPurple.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.developer_mode,
+                          color: AppTheme.primaryPurple,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'DEVELOPER',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          color: AppTheme.text,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   const Divider(color: AppTheme.stroke, height: 1),
                   const SizedBox(height: 10),
                   const Text(
-                    'Menaxhimi i Bizneseve',
+                    'Panel për testim dhe debug',
                     style: TextStyle(
                       color: AppTheme.muted,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified_user, size: 12, color: Colors.green.shade700),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Superadmin',
+                          style: TextStyle(
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const Spacer(),
@@ -694,17 +758,92 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // System Info Card
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                AppTheme.primaryPurple.withOpacity(0.1),
+                                Colors.blue.withOpacity(0.08),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.primaryPurple.withOpacity(0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline, color: AppTheme.primaryPurple, size: 32),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Developer Panel',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 16,
+                                        color: AppTheme.text,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Këtu mund të shihni të gjitha bizneset e regjistruara, përdoruesit, dhe informacione të tjera diagnostikuese.',
+                                      style: TextStyle(
+                                        color: AppTheme.muted,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 18),
                         Row(
                           children: [
+                            const Icon(Icons.business, color: AppTheme.text, size: 22),
+                            const SizedBox(width: 8),
                             const Text(
-                              'Bizneset',
+                              'Të gjitha bizneset',
                               style: TextStyle(
                                 color: AppTheme.text,
                                 fontWeight: FontWeight.w900,
                                 fontSize: 18,
                               ),
                             ),
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryPurple.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${businesses.length} ${businesses.length == 1 ? 'biznes' : 'biznese'}',
+                                style: const TextStyle(
+                                  color: AppTheme.primaryPurple,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
                             const Spacer(),
+                            OutlinedButton.icon(
+                              onPressed: _loadBusinesses,
+                              icon: const Icon(Icons.refresh, size: 18),
+                              label: const Text('Rifresko'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.text,
+                                side: const BorderSide(color: AppTheme.stroke),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             FilledButton.icon(
                               onPressed: _openCreateBusinessDialog,
                               icon: const Icon(Icons.add_business),
@@ -772,11 +911,31 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                                                 color: AppTheme.primaryPurple,
                                               ),
                                             ),
-                                            title: Text(
-                                              b.name,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w900,
-                                              ),
+                                            title: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    b.name,
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.w900,
+                                                    ),
+                                                  ),
+                                                ),
+                                                // Stats badges
+                                                if (businessStats[b.id] != null) ...[
+                                                  _statBadge(
+                                                    icon: Icons.inventory_2,
+                                                    label: '${businessStats[b.id]!['products']} prod.',
+                                                    color: Colors.blue,
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  _statBadge(
+                                                    icon: Icons.people,
+                                                    label: '${businessStats[b.id]!['users']} users',
+                                                    color: Colors.orange,
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                             subtitle: Column(
                                               crossAxisAlignment:
@@ -1022,6 +1181,32 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                       ],
                     ),
                   ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statBadge({required IconData icon, required String label, required Color color}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 10,
+            ),
           ),
         ],
       ),

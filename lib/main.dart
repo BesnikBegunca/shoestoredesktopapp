@@ -17,11 +17,21 @@ Future<void> main() async {
   const windowOptions = WindowOptions(
     title: 'Shoe Store Manager',
     center: true,
-    minimumSize: Size(1200, 800),
+    fullScreen: false,
+    skipTaskbar: false,
   );
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.maximize();
+    // Set window size to a reasonable default
+    await windowManager.setSize(const Size(1400, 900));
+    await windowManager.center();
+    
+    // Enable window controls (close, minimize, maximize)
+    await windowManager.setResizable(true);
+    await windowManager.setMinimizable(true);
+    await windowManager.setMaximizable(true);
+    await windowManager.setClosable(true);
+    
     await windowManager.show();
     await windowManager.focus();
   });
@@ -39,6 +49,14 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
       home: const BootGate(),
+      builder: (context, child) {
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
+          color: AppTheme.bg,
+          child: child,
+        );
+      },
     );
   }
 }

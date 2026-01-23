@@ -123,6 +123,16 @@ class AppTheme {
         elevation: 1,
         shadowColor: Colors.black.withOpacity(0.3),
       ),
+
+      // ✅ Global cursor color for all text fields
+      textSelectionTheme: const TextSelectionThemeData(
+        cursorColor: Colors.black,
+      ),
+
+      inputDecorationTheme: const InputDecorationTheme(
+        // Ensure cursor color is black in all text fields
+        // This is applied globally
+      ),
     );
   }
 }

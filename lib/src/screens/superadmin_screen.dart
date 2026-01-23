@@ -807,7 +807,22 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                         const SizedBox(height: 18),
                         Row(
                           children: [
-                            const Icon(Icons.business, color: AppTheme.text, size: 22),
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image.asset(
+                                  'assets/icons/binary_devs.png',
+                                  width: 28,
+                                  height: 28,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
                             const SizedBox(width: 8),
                             const Text(
                               'Të gjitha bizneset',
@@ -904,11 +919,14 @@ class _SuperAdminScreenState extends State<SuperAdminScreen> {
                                           margin: EdgeInsets.zero,
                                           child: ListTile(
                                             leading: CircleAvatar(
-                                              backgroundColor: AppTheme.primaryPurple
-                                                  .withOpacity(0.15),
-                                              child: const Icon(
-                                                Icons.business,
-                                                color: AppTheme.primaryPurple,
+                                              backgroundColor: Colors.transparent,
+                                              child: ClipOval(
+                                                child: Image.asset(
+                                                  'assets/icons/binary_devs.png',
+                                                  width: 40,
+                                                  height: 40,
+                                                  fit: BoxFit.cover,
+                                                ),
                                               ),
                                             ),
                                             title: Row(

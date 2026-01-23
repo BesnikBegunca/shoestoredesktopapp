@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 
 import '../local/local_api.dart';
@@ -74,24 +75,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           // Simple Header
           Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+            decoration: const BoxDecoration(
+              color: AppTheme.bgPage,
             ),
             padding: const EdgeInsets.all(24),
             child: Row(
               children: [
+                SvgPicture.asset(
+                  'assets/icons/permbledhja.svg',
+                  width: 32,
+                  height: 32,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.black,
+                    BlendMode.srcIn,
+                  ),
+                ),
+                const SizedBox(width: 16),
                 const Text(
-                  'Permbledhja',
+                  'Përmbledhja',
                   style: TextStyle(
                     fontSize: 28,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w500,
                     color: AppTheme.text,
                   ),
                 ),
@@ -312,7 +316,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 'Shitjet e Javës së Fundit',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w400,
                   color: AppTheme.text,
                 ),
               ),
@@ -470,7 +474,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Përmbledhje Financiare',
             style: TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w400,
               color: AppTheme.text,
             ),
           ),
@@ -544,7 +548,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Quick Stats',
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w400,
               color: AppTheme.text,
             ),
           ),
@@ -592,7 +596,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             label,
             style: TextStyle(
               color: AppTheme.muted,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w400,
               fontSize: 13,
             ),
           ),
@@ -624,7 +628,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Shitje të Fundit',
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w400,
               color: AppTheme.text,
             ),
           ),

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -541,7 +542,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             title,
             style: const TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w400,
               color: Colors.black87,
             ),
           ),
@@ -666,7 +667,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final totalStock = _totalStock(sizeStockPreview);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppTheme.bgPage,
       body: Form(
         key: _formKey,
         child: Column(
@@ -674,40 +675,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
             // Header
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+              decoration: const BoxDecoration(
+                color: AppTheme.bgPage,
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.primaryPurple,
-                          AppTheme.primaryPurple.withOpacity(0.8),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryPurple.withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.warehouse,
-                      color: Colors.white,
-                      size: 36,
+                  SvgPicture.asset(
+                    'assets/icons/stoku.svg',
+                    width: 36,
+                    height: 36,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.black,
+                      BlendMode.srcIn,
                     ),
                   ),
                   const SizedBox(width: 20),
@@ -716,21 +695,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Inventory',
+                          'Regjistrimi i Mallit',
                           style: TextStyle(
                             fontSize: 32,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w500,
                             color: Colors.black,
                             letterSpacing: -0.5,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Shto ose modifiko produkt',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -1051,15 +1021,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
             // Footer with Save Button
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
+              decoration: const BoxDecoration(
+                color: AppTheme.bgPage,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,

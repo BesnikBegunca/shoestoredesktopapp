@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -596,40 +597,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
             // Header - Identik me Shtija Ditore
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+              decoration: const BoxDecoration(
+                color: AppTheme.bgSurface,
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.primaryPurple,
-                          AppTheme.primaryPurple.withOpacity(0.8),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryPurple.withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.inventory_2,
-                      color: Colors.white,
-                      size: 36,
+                  SvgPicture.asset(
+                    'assets/icons/regjistrimi_mallit.svg',
+                    width: 36,
+                    height: 36,
+                    colorFilter: const ColorFilter.mode(
+                      Colors.black,
+                      BlendMode.srcIn,
                     ),
                   ),
                   const SizedBox(width: 20),
@@ -641,18 +620,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           'Stoku/Produktet',
                           style: TextStyle(
                             fontSize: 32,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w500,
                             color: Colors.black,
                             letterSpacing: -0.5,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Menaxho produktet dhe stokun',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -841,7 +811,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return Text(
       text,
       style: const TextStyle(
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w400,
         color: Colors.black87,
         fontSize: 14,
         letterSpacing: 0.2,

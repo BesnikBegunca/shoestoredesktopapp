@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
@@ -288,15 +289,8 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
         children: [
           // Header
           Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+            decoration: const BoxDecoration(
+              color: AppTheme.bgPage,
             ),
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -304,17 +298,13 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(
-                        Icons.trending_down,
-                        color: Colors.red.shade700,
-                        size: 32,
+                    SvgPicture.asset(
+                      'assets/icons/shpenzimet.svg',
+                      width: 32,
+                      height: 32,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.black,
+                        BlendMode.srcIn,
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -326,17 +316,8 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                             'Shpenzimet',
                             style: TextStyle(
                               fontSize: 28,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w500,
                               color: AppTheme.text,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Menaxhimi i shpenzimeve dhe investimeve',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.muted,
-                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -593,25 +574,36 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                         const SizedBox(height: 32),
 
                         // Category filter
-                        Row(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.filter_list, size: 24, color: AppTheme.text),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Filtro sipas kategorisë:',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.text,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Wrap(
-                              spacing: 8,
+                            Row(
                               children: [
-                                _categoryChip('Të gjitha', 'all'),
-                                ..._categories.map((cat) => _categoryChip(cat, cat)).toList(),
+                                const Icon(Icons.filter_list, size: 24, color: AppTheme.text),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Filtro sipas kategorisë:',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: AppTheme.text,
+                                  ),
+                                ),
                               ],
+                            ),
+                            const SizedBox(height: 12),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _categoryChip('Të gjitha', 'all'),
+                                  const SizedBox(width: 8),
+                                  ..._categories.map((cat) => Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: _categoryChip(cat, cat),
+                                  )).toList(),
+                                ],
+                              ),
                             ),
                           ],
                         ),

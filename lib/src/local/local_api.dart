@@ -10,10 +10,12 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../printing/receipt_pdf_80mm.dart';
 import '../../printing/receipt_preview.dart';
+import '../db/database_manager.dart';
+import '../license/license_service.dart';
 
 /// ✅ DB VERSION
 /// IMPORTANT: Kur shton tabela/kolona, rrite version-in
-const int kDbVersion = 10;
+const int kDbVersion = 11;
 
 /* ======================= SQL ======================= */
 
@@ -42,8 +44,24 @@ CREATE TABLE IF NOT EXISTS products (
   active INTEGER NOT NULL DEFAULT 1,
   imagePath TEXT,
   sizeStockJson TEXT,
+  category TEXT,
+  subcategory TEXT,
   createdAtMs INTEGER,
   updatedAtMs INTEGER
+);
+''';
+
+const String kSqlCreateProductVariants = '''
+CREATE TABLE IF NOT EXISTS product_variants (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  productId INTEGER NOT NULL,
+  sku TEXT NOT NULL UNIQUE,
+  size TEXT NOT NULL,
+  quantity INTEGER NOT NULL DEFAULT 0,
+  barcode TEXT,
+  createdAtMs INTEGER,
+  updatedAtMs INTEGER,
+  FOREIGN KEY (productId) REFERENCES products(id) ON DELETE CASCADE
 );
 ''';
 
@@ -202,6 +220,76 @@ String _encodeSizeStock(Map<int, int> sizeStock) {
 int _totalStock(Map<int, int> sizeStock) =>
     sizeStock.values.fold(0, (a, b) => a + (b < 0 ? 0 : b));
 
+/* ======================= SKU GENERATION ======================= */
+
+// Mapping për kategori dhe subkategori
+final Map<String, String> _categoryCodes = {
+  'Patika': 'PAT',
+  'Rroba Stinore': 'ROB',
+  'Rroba Sportive': 'ROB',
+  'Rroba Gjumi': 'ROB',
+  'Bebe': 'BEB',
+  'Vajza': 'VAJ',
+  'Djem': 'DJE',
+  'Aksesorë': 'AKS',
+};
+
+final Map<String, String> _subcategoryCodes = {
+  'Bebe': 'BEB',
+  'Vajza': 'VAJ',
+  'Djem': 'DJE',
+  'Patika bebe': 'BEB',
+  'Patika vajza': 'VAJ',
+  'Patika djem': 'DJE',
+  'Patika sportive': 'SPO',
+  'Patika shkollore': 'SHK',
+  'Patika verore': 'VER',
+  'Patika dimërore': 'DIM',
+};
+
+/// Normalizim i tekstit për SKU: uppercase, pa hapësira, hiq karaktere speciale
+String _normalizeForSku(String text) {
+  return text
+      .toUpperCase()
+      .replaceAll(RegExp(r'[^A-Z0-9]'), '')
+      .trim();
+}
+
+/// Gjeneron SKU për variant: [CAT]-[SUBCAT]-[NAME]-[SIZE]
+String generateVariantSku({
+  required String? category,
+  required String? subcategory,
+  required String productName,
+  required String size,
+}) {
+  final catCode = category != null && _categoryCodes.containsKey(category)
+      ? _categoryCodes[category]!
+      : 'UNK';
+  
+  String subCode = 'UNK';
+  if (subcategory != null) {
+    // Provo fillimisht në subcategoryCodes
+    if (_subcategoryCodes.containsKey(subcategory)) {
+      subCode = _subcategoryCodes[subcategory]!;
+    } else {
+      // Nëse nuk gjet, provo në categoryCodes
+      subCode = _categoryCodes[subcategory] ?? 'UNK';
+    }
+  } else if (category != null) {
+    // Nëse nuk ka subcategory, përdor category si subcategory
+    subCode = _categoryCodes[category] ?? 'UNK';
+  }
+  
+  final nameNormalized = _normalizeForSku(productName);
+  final sizeNormalized = _normalizeForSku(size);
+  
+  if (nameNormalized.isEmpty) {
+    throw Exception('Emri i produktit nuk mund të jetë bosh për SKU');
+  }
+  
+  return '$catCode-$subCode-$nameNormalized-$sizeNormalized';
+}
+
 /* ======================= MODELS ======================= */
 
 class Product {
@@ -216,6 +304,8 @@ class Product {
   final bool active;
   final String? imagePath;
   final Map<int, int> sizeStock;
+  final String? category;
+  final String? subcategory;
   final int? createdAtMs;
   final int? updatedAtMs;
 
@@ -231,6 +321,8 @@ class Product {
     required this.active,
     this.imagePath,
     required this.sizeStock,
+    this.category,
+    this.subcategory,
     this.createdAtMs,
     this.updatedAtMs,
   });
@@ -268,6 +360,43 @@ class Product {
       active: ((r['active'] as int?) ?? 1) == 1,
       imagePath: r['imagePath'] as String?,
       sizeStock: sizeStock,
+      category: r['category'] as String?,
+      subcategory: r['subcategory'] as String?,
+      createdAtMs: r['createdAtMs'] as int?,
+      updatedAtMs: r['updatedAtMs'] as int?,
+    );
+  }
+}
+
+class ProductVariant {
+  final int id;
+  final int productId;
+  final String sku;
+  final String size;
+  final int quantity;
+  final String? barcode;
+  final int? createdAtMs;
+  final int? updatedAtMs;
+
+  const ProductVariant({
+    required this.id,
+    required this.productId,
+    required this.sku,
+    required this.size,
+    required this.quantity,
+    this.barcode,
+    this.createdAtMs,
+    this.updatedAtMs,
+  });
+
+  static ProductVariant fromRow(Map<String, Object?> r) {
+    return ProductVariant(
+      id: (r['id'] as int),
+      productId: (r['productId'] as int),
+      sku: (r['sku'] as String?) ?? '',
+      size: (r['size'] as String?) ?? '',
+      quantity: (r['quantity'] as int?) ?? 0,
+      barcode: r['barcode'] as String?,
       createdAtMs: r['createdAtMs'] as int?,
       updatedAtMs: r['updatedAtMs'] as int?,
     );
@@ -412,15 +541,30 @@ class SellResult {
 
 class CartItem {
   final Product product;
-  final int size;
+  final int size; // Për backward compatibility
   int quantity;
+  
+  // ✅ NEW: Variant info
+  final int? variantId; // ID e variantit (SKU) në product_variants
+  final String? variantSku; // SKU e variantit
+  final String? variantSize; // Masa e variantit si string
 
-  CartItem({required this.product, required this.size, this.quantity = 1});
+  CartItem({
+    required this.product,
+    required this.size,
+    this.quantity = 1,
+    this.variantId,
+    this.variantSku,
+    this.variantSize,
+  });
 
   double get unitPrice => product.finalPrice;
   double get lineTotal => unitPrice * quantity;
   double get lineProfit =>
       (unitPrice - (product.purchasePrice ?? 0)) * quantity;
+  
+  // ✅ Helper për të identifikuar nëse është variant
+  bool get isVariant => variantId != null;
 }
 
 /// ✅ Stats per punëtor
@@ -442,188 +586,27 @@ class LocalApi {
   LocalApi._();
   static final LocalApi I = LocalApi._();
 
-  Database? _db;
   bool _ready = false;
 
   Future<void> init() async {
     if (_ready) return;
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-    await _open();
+    
+    // Initialize DatabaseManager (opens admin DB)
+    await DatabaseManager.getAdminDb();
+    
     _ready = true;
   }
 
-  Future<void> _tryAddColumn(
-    Database d, {
-    required String table,
-    required String columnSql,
-  }) async {
-    try {
-      await d.execute('ALTER TABLE $table ADD COLUMN $columnSql');
-    } catch (_) {}
-  }
-
-  Future<Database> _open() async {
-    if (_db != null) return _db!;
-    final Directory dir = await getApplicationSupportDirectory();
-    await dir.create(recursive: true);
-    final String dbPath = p.join(dir.path, 'shoe_store.sqlite');
-
-    final db = await openDatabase(
-      dbPath,
-      version: kDbVersion,
-      onCreate: (d, v) async {
-        await d.execute(kSqlCreateUsers);
-        await d.execute(kSqlCreateProducts);
-        await d.execute(kSqlCreateSales);
-        await d.execute(kSqlCreateSaleItems);
-        await d.execute(kSqlCreateInvestments);
-        await d.execute(kSqlCreateExpenses);
-        await d.execute(kSqlCreateSettlements);
-        await d.execute(kSqlCreateBusinesses); // ✅ NEW
-      },
-      onUpgrade: (d, oldV, newV) async {
-        // ensure tables exist
-        await d.execute(kSqlCreateUsers);
-        await d.execute(kSqlCreateProducts);
-        await d.execute(kSqlCreateSales);
-        await d.execute(kSqlCreateSaleItems);
-        await d.execute(kSqlCreateInvestments);
-        await d.execute(kSqlCreateExpenses);
-        await d.execute(kSqlCreateSettlements);
-        await d.execute(kSqlCreateBusinesses); // ✅ NEW
-
-        // columns for old dbs
-        await _tryAddColumn(
-          d,
-          table: 'products',
-          columnSql: 'sizeStockJson TEXT',
-        );
-        await _tryAddColumn(
-          d,
-          table: 'sale_items',
-          columnSql: 'shoeSize INTEGER',
-        );
-
-        await _tryAddColumn(
-          d,
-          table: 'sales',
-          columnSql: 'revertedAtMs INTEGER',
-        );
-        await _tryAddColumn(d, table: 'sales', columnSql: 'userId INTEGER');
-        await _tryAddColumn(
-          d,
-          table: 'sales',
-          columnSql: 'settledAtMs INTEGER',
-        );
-
-        await _tryAddColumn(
-          d,
-          table: 'investments',
-          columnSql: 'revertedAtMs INTEGER',
-        );
-        await _tryAddColumn(
-          d,
-          table: 'expenses',
-          columnSql: 'revertedAtMs INTEGER',
-        );
-        await _tryAddColumn(d, table: 'expenses', columnSql: 'userId INTEGER');
-
-        // ✅ NEW: migration për version 9
-        if (oldV < 9) {
-          await _tryAddColumn(
-            d,
-            table: 'users',
-            columnSql: 'businessId INTEGER',
-          );
-        }
-        // ✅ NEW: migration për version 10 - shto kolona të reja për businesses
-        if (oldV < 10) {
-          await _tryAddColumn(d, table: 'businesses', columnSql: 'city TEXT');
-          await _tryAddColumn(d, table: 'businesses', columnSql: 'postalCode TEXT');
-          await _tryAddColumn(d, table: 'businesses', columnSql: 'ownerName TEXT');
-          await _tryAddColumn(d, table: 'businesses', columnSql: 'taxId TEXT');
-          await _tryAddColumn(d, table: 'businesses', columnSql: 'registrationNumber TEXT');
-          await _tryAddColumn(d, table: 'businesses', columnSql: 'contactPerson TEXT');
-          await _tryAddColumn(d, table: 'businesses', columnSql: 'website TEXT');
-        }
-      },
-      onOpen: (d) async {
-        await d.execute(kSqlCreateUsers);
-        await d.execute(kSqlCreateProducts);
-        await d.execute(kSqlCreateSales);
-        await d.execute(kSqlCreateSaleItems);
-        await d.execute(kSqlCreateInvestments);
-        await d.execute(kSqlCreateExpenses);
-        await d.execute(kSqlCreateSettlements);
-        await d.execute(kSqlCreateBusinesses); // ✅ NEW
-
-        await _tryAddColumn(
-          d,
-          table: 'products',
-          columnSql: 'sizeStockJson TEXT',
-        );
-        await _tryAddColumn(
-          d,
-          table: 'sale_items',
-          columnSql: 'shoeSize INTEGER',
-        );
-
-        await _tryAddColumn(
-          d,
-          table: 'sales',
-          columnSql: 'revertedAtMs INTEGER',
-        );
-        await _tryAddColumn(d, table: 'sales', columnSql: 'userId INTEGER');
-        await _tryAddColumn(
-          d,
-          table: 'sales',
-          columnSql: 'settledAtMs INTEGER',
-        );
-
-        await _tryAddColumn(
-          d,
-          table: 'investments',
-          columnSql: 'revertedAtMs INTEGER',
-        );
-        await _tryAddColumn(
-          d,
-          table: 'expenses',
-          columnSql: 'revertedAtMs INTEGER',
-        );
-        await _tryAddColumn(d, table: 'expenses', columnSql: 'userId INTEGER');
-
-        // ✅ NEW: ensure businessId column exists
-        await _tryAddColumn(
-          d,
-          table: 'users',
-          columnSql: 'businessId INTEGER',
-        );
-        // ✅ NEW: ensure new business columns exist
-        await _tryAddColumn(d, table: 'businesses', columnSql: 'city TEXT');
-        await _tryAddColumn(d, table: 'businesses', columnSql: 'postalCode TEXT');
-        await _tryAddColumn(d, table: 'businesses', columnSql: 'ownerName TEXT');
-        await _tryAddColumn(d, table: 'businesses', columnSql: 'taxId TEXT');
-        await _tryAddColumn(d, table: 'businesses', columnSql: 'registrationNumber TEXT');
-        await _tryAddColumn(d, table: 'businesses', columnSql: 'contactPerson TEXT');
-        await _tryAddColumn(d, table: 'businesses', columnSql: 'website TEXT');
-      },
-    );
-
-    _db = db;
-    return db;
-  }
-
   Future<void> close() async {
-    final db = _db;
-    _db = null;
-    if (db != null) await db.close();
+    await DatabaseManager.closeAll();
   }
 
   // ================= USERS / AUTH =================
 
   Future<void> ensureDefaultAdmin() async {
-    final db = await _open();
+    final db = await DatabaseManager.getAdminDb();
     // ✅ Kontrollo nëse ka superadmin me username 'superadmin'
     final superadminRows = await db.rawQuery(
       "SELECT id FROM users WHERE username='superadmin' AND role='superadmin' LIMIT 1",
@@ -653,7 +636,6 @@ class LocalApi {
           'username': 'superadmin',
           'password': '123123',
           'role': 'superadmin',
-          'businessId': null,
         },
         where: 'id = ?',
         whereArgs: [adminId],
@@ -670,7 +652,6 @@ class LocalApi {
         'role': 'superadmin',
         'active': 1,
         'createdAtMs': now,
-        'businessId': null,
       });
     } catch (e) {
       // Nëse username 'superadmin' ekziston tashmë, përditëso atë
@@ -680,7 +661,6 @@ class LocalApi {
           {
             'password': '123123',
             'role': 'superadmin',
-            'businessId': null,
             'active': 1,
           },
           where: 'username = ?',
@@ -696,49 +676,60 @@ class LocalApi {
     required String username,
     required String password,
   }) async {
-    final db = await _open();
     final u = username.trim();
     final p0 = password;
     if (u.isEmpty) throw Exception('Shkruaj username ose email.');
     if (p0.isEmpty) throw Exception('Shkruaj password.');
 
-    // ✅ Provo fillimisht me username
-    var rows = await db.query(
+    // ✅ Provo fillimisht në admin DB (për superadmin)
+    final adminDb = await DatabaseManager.getAdminDb();
+    var rows = await adminDb.query(
       'users',
       where: 'username = ? AND password = ? AND active = 1',
       whereArgs: [u, p0],
       limit: 1,
     );
 
-    // ✅ Nëse nuk gjet me username, provo me email nga businesses
-    if (rows.isEmpty) {
-      final businessRows = await db.query(
-        'businesses',
-        where: 'email = ? AND password = ? AND active = 1',
-        whereArgs: [u, p0],
+    // Nëse gjet superadmin, ktheje
+    if (rows.isNotEmpty) {
+      return AppUser.fromRow(rows.first);
+    }
+
+    // ✅ Nëse nuk gjet, provo me email/password nga businesses
+    final businessRows = await adminDb.query(
+      'businesses',
+      where: '(email = ? OR name = ?) AND password = ? AND active = 1',
+      whereArgs: [u, u, p0],
+      limit: 1,
+    );
+    
+    if (businessRows.isNotEmpty) {
+      final businessId = businessRows.first['id'] as int;
+      
+      // ✅ Hap databazën e biznesit dhe gjej admin user
+      final businessDb = await DatabaseManager.getBusinessDb(businessId);
+      rows = await businessDb.query(
+        'users',
+        where: 'businessId = ? AND role = ? AND active = 1',
+        whereArgs: [businessId, 'admin'],
         limit: 1,
       );
       
-      if (businessRows.isNotEmpty) {
-        final businessId = businessRows.first['id'] as int;
-        // ✅ Gjej user-in e biznesit
-        rows = await db.query(
-          'users',
-          where: 'businessId = ? AND role = ? AND active = 1',
-          whereArgs: [businessId, 'admin'],
-          limit: 1,
-        );
+      if (rows.isNotEmpty) {
+        return AppUser.fromRow(rows.first);
       }
     }
 
-    if (rows.isEmpty) {
-      throw Exception('User nuk ekziston ose password gabim.');
-    }
-    return AppUser.fromRow(rows.first);
+    throw Exception('User nuk ekziston ose password gabim.');
   }
 
-  Future<List<AppUser>> getUsers({bool onlyActive = true}) async {
-    final db = await _open();
+  Future<List<AppUser>> getUsers({bool onlyActive = true, int? businessId}) async {
+    // Nëse businessId është specifikuar, merri nga business DB
+    // Përndryshe, merri nga admin DB (superadmin users)
+    final db = businessId != null 
+        ? await DatabaseManager.getBusinessDb(businessId)
+        : await DatabaseManager.getAdminDb();
+        
     final rows = await db.query(
       'users',
       where: onlyActive ? 'active = 1' : null,
@@ -748,9 +739,14 @@ class LocalApi {
   }
 
   Future<List<AppUser>> getAllUsers() async {
-    final db = await _open();
-    final rows = await db.query('users', orderBy: 'createdAtMs DESC');
-    return rows.map(AppUser.fromRow).toList();
+    // Merr të gjithë users nga admin DB + të gjitha business DBs
+    final adminDb = await DatabaseManager.getAdminDb();
+    final adminUsers = await adminDb.query('users', orderBy: 'createdAtMs DESC');
+    
+    final allUsers = <AppUser>[];
+    allUsers.addAll(adminUsers.map(AppUser.fromRow));
+    
+    return allUsers;
   }
 
   Future<int> createUser({
@@ -759,7 +755,6 @@ class LocalApi {
     required String role,
     int? businessId,
   }) async {
-    final db = await _open();
     final u = username.trim();
     if (u.isEmpty) throw Exception('Username i zbrazët.');
     if (password.isEmpty) throw Exception('Password i zbrazët.');
@@ -768,6 +763,11 @@ class LocalApi {
     }
 
     final now = DateTime.now().millisecondsSinceEpoch;
+    
+    // Përcakto cilin DB të përdorësh
+    final db = businessId != null 
+        ? await DatabaseManager.getBusinessDb(businessId)
+        : await DatabaseManager.getAdminDb();
 
     try {
       return await db.insert('users', {
@@ -790,7 +790,6 @@ class LocalApi {
     required String role,
     int? businessId,
   }) async {
-    final db = await _open();
     final u = username.trim();
     final r = role.trim();
     if (u.isEmpty) throw Exception('Username i zbrazët.');
@@ -803,6 +802,11 @@ class LocalApi {
     if (p0 != null && p0.isNotEmpty) data['password'] = p0;
     if (businessId != null) data['businessId'] = businessId;
 
+    // Përdor businessId për të përcaktuar DB
+    final db = businessId != null 
+        ? await DatabaseManager.getBusinessDb(businessId)
+        : await DatabaseManager.getAdminDb();
+
     try {
       await db.update('users', data, where: 'id = ?', whereArgs: [userId]);
     } catch (_) {
@@ -810,8 +814,11 @@ class LocalApi {
     }
   }
 
-  Future<void> setUserActive(int userId, bool active) async {
-    final db = await _open();
+  Future<void> setUserActive(int userId, bool active, {int? businessId}) async {
+    final db = businessId != null 
+        ? await DatabaseManager.getBusinessDb(businessId)
+        : await DatabaseManager.getAdminDb();
+        
     await db.update(
       'users',
       {'active': active ? 1 : 0},
@@ -820,13 +827,19 @@ class LocalApi {
     );
   }
 
-  Future<void> deleteUser(int userId) async {
-    final db = await _open();
+  Future<void> deleteUser(int userId, {int? businessId}) async {
+    final db = businessId != null 
+        ? await DatabaseManager.getBusinessDb(businessId)
+        : await DatabaseManager.getAdminDb();
+        
     await db.delete('users', where: 'id = ?', whereArgs: [userId]);
   }
 
-  Future<AppUser?> getUserById(int userId) async {
-    final db = await _open();
+  Future<AppUser?> getUserById(int userId, {int? businessId}) async {
+    final db = businessId != null 
+        ? await DatabaseManager.getBusinessDb(businessId)
+        : await DatabaseManager.getAdminDb();
+        
     final rows = await db.query(
       'users',
       where: 'id = ?',
@@ -854,8 +867,9 @@ class LocalApi {
     String? website,
     String? notes,
     required int createdByUserId,
+    int validDays = 365, // Default 365 ditë
   }) async {
-    final db = await _open();
+    final adminDb = await DatabaseManager.getAdminDb();
     final n = name.trim();
     if (n.isEmpty) throw Exception('Emri i biznesit i zbrazët.');
     if (password.isEmpty) throw Exception('Password i zbrazët.');
@@ -863,7 +877,8 @@ class LocalApi {
     final now = DateTime.now().millisecondsSinceEpoch;
 
     try {
-      final businessId = await db.insert('businesses', {
+      // 1. Krijo biznesin në admin DB
+      final businessId = await adminDb.insert('businesses', {
         'name': n,
         'password': password,
         'address': address?.trim(),
@@ -882,16 +897,39 @@ class LocalApi {
         'active': 1,
       });
 
-      // ✅ Automatikisht krijo user për biznesin
-      // Përdor email si username nëse ka, përndryshe përdor emrin e biznesit
+      // 2. ✅ Krijo databazën e biznesit
+      await DatabaseManager.createBusinessDatabase(businessId);
+      final businessDb = await DatabaseManager.getBusinessDb(businessId);
+
+      // 3. ✅ Krijo admin user në business DB
       final usernameForUser = email?.trim().isNotEmpty == true ? email!.trim() : n;
-      await db.insert('users', {
+      await businessDb.insert('users', {
         'username': usernameForUser,
         'password': password,
         'role': 'admin',
         'active': 1,
         'createdAtMs': now,
         'businessId': businessId,
+      });
+
+      // 4. ✅ AUTO-KRIJO LICENSËN (365 ditë by default)
+      final licenseKey = await LicenseService.I.generateLicenseKey(
+        'business-$businessId',
+        validDays: validDays,
+      );
+      
+      final expiresAtMs = now + (validDays * 24 * 60 * 60 * 1000);
+      
+      await adminDb.insert('business_licenses', {
+        'businessId': businessId,
+        'licenseKey': licenseKey,
+        'validDays': validDays,
+        'issuedAtMs': now,
+        'expiresAtMs': expiresAtMs,
+        'activatedAtMs': now,
+        'lastCheckedMs': now,
+        'active': 1,
+        'notes': 'Auto-krijuar gjatë regjistrimit të biznesit',
       });
 
       return businessId;
@@ -903,20 +941,25 @@ class LocalApi {
     }
   }
 
-  Future<List<Business>> getBusinesses({required int createdByUserId}) async {
-    final db = await _open();
-    final rows = await db.query(
-      'businesses',
-      where: 'createdByUserId = ?',
-      whereArgs: [createdByUserId],
-      orderBy: 'createdAtMs DESC',
-    );
+  Future<List<Business>> getBusinesses({int? createdByUserId}) async {
+    final adminDb = await DatabaseManager.getAdminDb();
+    final rows = createdByUserId != null
+        ? await adminDb.query(
+            'businesses',
+            where: 'createdByUserId = ?',
+            whereArgs: [createdByUserId],
+            orderBy: 'createdAtMs DESC',
+          )
+        : await adminDb.query(
+            'businesses',
+            orderBy: 'createdAtMs DESC',
+          );
     return rows.map(Business.fromRow).toList();
   }
 
   Future<Business?> getBusinessById(int businessId) async {
-    final db = await _open();
-    final rows = await db.query(
+    final adminDb = await DatabaseManager.getAdminDb();
+    final rows = await adminDb.query(
       'businesses',
       where: 'id = ?',
       whereArgs: [businessId],
@@ -942,7 +985,7 @@ class LocalApi {
     String? website,
     String? notes,
   }) async {
-    final db = await _open();
+    final adminDb = await DatabaseManager.getAdminDb();
     final n = name.trim();
     if (n.isEmpty) throw Exception('Emri i biznesit i zbrazët.');
 
@@ -963,19 +1006,17 @@ class LocalApi {
     if (notes != null) data['notes'] = notes.trim().isEmpty ? null : notes.trim();
 
     try {
-      await db.update('businesses', data, where: 'id = ?', whereArgs: [businessId]);
+      await adminDb.update('businesses', data, where: 'id = ?', whereArgs: [businessId]);
 
       // ✅ Nëse password u ndryshua, përditëso edhe user-in e biznesit
       if (password != null && password.isNotEmpty) {
-        final business = await getBusinessById(businessId);
-        if (business != null) {
-          await db.update(
-            'users',
-            {'password': password},
-            where: 'businessId = ? AND role = ?',
-            whereArgs: [businessId, 'admin'],
-          );
-        }
+        final businessDb = await DatabaseManager.getBusinessDb(businessId);
+        await businessDb.update(
+          'users',
+          {'password': password},
+          where: 'businessId = ? AND role = ?',
+          whereArgs: [businessId, 'admin'],
+        );
       }
     } catch (e) {
       if (e.toString().contains('UNIQUE constraint')) {
@@ -986,27 +1027,82 @@ class LocalApi {
   }
 
   Future<void> deleteBusiness(int businessId) async {
-    final db = await _open();
-    // ✅ Fshi edhe user-at e biznesit
-    await db.delete('users', where: 'businessId = ?', whereArgs: [businessId]);
-    // ✅ Fshi biznesin
-    await db.delete('businesses', where: 'id = ?', whereArgs: [businessId]);
+    final adminDb = await DatabaseManager.getAdminDb();
+    
+    // ✅ Fshi licensat
+    await adminDb.delete('business_licenses', where: 'businessId = ?', whereArgs: [businessId]);
+    
+    // ✅ Fshi biznesin nga admin DB
+    await adminDb.delete('businesses', where: 'id = ?', whereArgs: [businessId]);
+    
+    // ✅ Fshi databazën e biznesit
+    await DatabaseManager.deleteBusinessDatabase(businessId);
   }
 
   Future<void> setBusinessActive(int businessId, bool active) async {
-    final db = await _open();
-    await db.update(
+    final adminDb = await DatabaseManager.getAdminDb();
+    await adminDb.update(
       'businesses',
       {'active': active ? 1 : 0},
       where: 'id = ?',
       whereArgs: [businessId],
     );
-    // ✅ Deaktivizo edhe user-at e biznesit
-    await db.update(
+    
+    // ✅ Deaktivizo edhe user-at e biznesit në business DB
+    final businessDb = await DatabaseManager.getBusinessDb(businessId);
+    await businessDb.update(
       'users',
       {'active': active ? 1 : 0},
       where: 'businessId = ?',
       whereArgs: [businessId],
+    );
+  }
+
+  // ================= BUSINESS LICENSES =================
+
+  /// Shto një licensë të re për një biznes
+  Future<int> addBusinessLicense({
+    required int businessId,
+    required String licenseKey,
+    required int validDays,
+    String? notes,
+  }) async {
+    final adminDb = await DatabaseManager.getAdminDb();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final expiresAtMs = now + (validDays * 24 * 60 * 60 * 1000);
+
+    return await adminDb.insert('business_licenses', {
+      'businessId': businessId,
+      'licenseKey': licenseKey,
+      'validDays': validDays,
+      'issuedAtMs': now,
+      'expiresAtMs': expiresAtMs,
+      'activatedAtMs': now,
+      'lastCheckedMs': now,
+      'active': 1,
+      'notes': notes,
+    });
+  }
+
+  /// Merr të gjitha licensat e një biznesi
+  Future<List<Map<String, Object?>>> getBusinessLicenses(int businessId) async {
+    final adminDb = await DatabaseManager.getAdminDb();
+    return await adminDb.query(
+      'business_licenses',
+      where: 'businessId = ?',
+      whereArgs: [businessId],
+      orderBy: 'issuedAtMs DESC',
+    );
+  }
+
+  /// Deaktivizo një licensë
+  Future<void> deactivateLicense(int licenseId) async {
+    final adminDb = await DatabaseManager.getAdminDb();
+    await adminDb.update(
+      'business_licenses',
+      {'active': 0},
+      where: 'id = ?',
+      whereArgs: [licenseId],
     );
   }
 
@@ -1015,9 +1111,78 @@ class LocalApi {
   Future<List<Product>> getProducts({
     String orderBy = 'createdAtMs DESC',
   }) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final rows = await db.query('products', orderBy: orderBy);
     return rows.map(Product.fromRow).toList();
+  }
+
+  /// Kontrollon nëse SKU ekziston tashmë
+  Future<bool> skuExists(String sku) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final rows = await db.query(
+      'product_variants',
+      where: 'sku = ?',
+      whereArgs: [sku.trim()],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  /// Merr variantet e një produkti
+  Future<List<ProductVariant>> getProductVariants(int productId) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final rows = await db.query(
+      'product_variants',
+      where: 'productId = ?',
+      whereArgs: [productId],
+      orderBy: 'size ASC',
+    );
+    return rows.map(ProductVariant.fromRow).toList();
+  }
+
+  /// Merr variantet që kanë një barcode të caktuar
+  Future<List<ProductVariant>> getVariantsByBarcode(String barcode) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final b = barcode.trim();
+    if (b.isEmpty) return [];
+    
+    final rows = await db.query(
+      'product_variants',
+      where: 'barcode = ?',
+      whereArgs: [b],
+      orderBy: 'size ASC',
+    );
+    return rows.map(ProductVariant.fromRow).toList();
+  }
+
+  /// Merr një variant specifik me ID
+  Future<ProductVariant?> getVariantById(int variantId) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final rows = await db.query(
+      'product_variants',
+      where: 'id = ?',
+      whereArgs: [variantId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return ProductVariant.fromRow(rows.first);
+  }
+
+  /// Merr produktin për një variant
+  Future<Product?> getProductByVariantId(int variantId) async {
+    final variant = await getVariantById(variantId);
+    if (variant == null) return null;
+    
+    final products = await getProducts();
+    return products.firstWhere(
+      (p) => p.id == variant.productId,
+      orElse: () => throw Exception('Produkti nuk u gjet për variant ID: $variantId'),
+    );
   }
 
   Future<int> addProduct({
@@ -1030,29 +1195,76 @@ class LocalApi {
     required double discountPercent,
     required bool active,
     String? imagePath,
+    String? category,
+    String? subcategory,
+    bool autoGenerateVariants = true,
   }) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final now = DateTime.now().millisecondsSinceEpoch;
     final total = _totalStock(sizeStock);
 
-    final map = {
-      'name': name.trim(),
-      'sku': (sku?.trim().isEmpty ?? true) ? null : sku!.trim(),
-      'serialNumber': (serialNumber?.trim().isEmpty ?? true)
-          ? null
-          : serialNumber!.trim(),
-      'price': round2(price),
-      'purchasePrice': purchasePrice == null ? null : round2(purchasePrice),
-      'stockQty': total,
-      'discountPercent': round2(discountPercent),
-      'active': active ? 1 : 0,
-      'imagePath': imagePath,
-      'sizeStockJson': _encodeSizeStock(sizeStock),
-      'createdAtMs': now,
-      'updatedAtMs': now,
-    };
+    return db.transaction((tx) async {
+      final map = {
+        'name': name.trim(),
+        'sku': (sku?.trim().isEmpty ?? true) ? null : sku!.trim(),
+        'serialNumber': (serialNumber?.trim().isEmpty ?? true)
+            ? null
+            : serialNumber!.trim(),
+        'price': round2(price),
+        'purchasePrice': purchasePrice == null ? null : round2(purchasePrice),
+        'stockQty': total,
+        'discountPercent': round2(discountPercent),
+        'active': active ? 1 : 0,
+        'imagePath': imagePath,
+        'sizeStockJson': _encodeSizeStock(sizeStock),
+        'category': category?.trim().isEmpty == true ? null : category?.trim(),
+        'subcategory': subcategory?.trim().isEmpty == true ? null : subcategory?.trim(),
+        'createdAtMs': now,
+        'updatedAtMs': now,
+      };
 
-    return db.insert('products', map);
+      final productId = await tx.insert('products', map);
+
+      // Krijo variantet automatikisht nëse autoGenerateVariants = true
+      if (autoGenerateVariants && (category != null || subcategory != null)) {
+        for (final entry in sizeStock.entries) {
+          final size = entry.key;
+          final qty = entry.value;
+          if (qty > 0) {
+            final variantSku = generateVariantSku(
+              category: category,
+              subcategory: subcategory,
+              productName: name,
+              size: size.toString(),
+            );
+
+            // Kontrollo uniqueness
+            final existing = await tx.query(
+              'product_variants',
+              where: 'sku = ?',
+              whereArgs: [variantSku],
+              limit: 1,
+            );
+            if (existing.isNotEmpty) {
+              throw Exception('SKU ekziston tashmë: $variantSku');
+            }
+
+            await tx.insert('product_variants', {
+              'productId': productId,
+              'sku': variantSku,
+              'size': size.toString(),
+              'quantity': qty,
+              'barcode': serialNumber,
+              'createdAtMs': now,
+              'updatedAtMs': now,
+            });
+          }
+        }
+      }
+
+      return productId;
+    });
   }
 
   Future<void> updateProduct({
@@ -1066,37 +1278,90 @@ class LocalApi {
     required double discountPercent,
     required bool active,
     String? imagePath,
+    String? category,
+    String? subcategory,
+    bool autoGenerateVariants = true,
   }) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final now = DateTime.now().millisecondsSinceEpoch;
     final total = _totalStock(sizeStock);
 
-    final map = {
-      'name': name.trim(),
-      'sku': (sku?.trim().isEmpty ?? true) ? null : sku!.trim(),
-      'serialNumber': (serialNumber?.trim().isEmpty ?? true)
-          ? null
-          : serialNumber!.trim(),
-      'price': round2(price),
-      'purchasePrice': purchasePrice == null ? null : round2(purchasePrice),
-      'stockQty': total,
-      'discountPercent': round2(discountPercent),
-      'active': active ? 1 : 0,
-      'imagePath': imagePath,
-      'sizeStockJson': _encodeSizeStock(sizeStock),
-      'updatedAtMs': now,
-    };
+    await db.transaction((tx) async {
+      final map = {
+        'name': name.trim(),
+        'sku': (sku?.trim().isEmpty ?? true) ? null : sku!.trim(),
+        'serialNumber': (serialNumber?.trim().isEmpty ?? true)
+            ? null
+            : serialNumber!.trim(),
+        'price': round2(price),
+        'purchasePrice': purchasePrice == null ? null : round2(purchasePrice),
+        'stockQty': total,
+        'discountPercent': round2(discountPercent),
+        'active': active ? 1 : 0,
+        'imagePath': imagePath,
+        'sizeStockJson': _encodeSizeStock(sizeStock),
+        'category': category?.trim().isEmpty == true ? null : category?.trim(),
+        'subcategory': subcategory?.trim().isEmpty == true ? null : subcategory?.trim(),
+        'updatedAtMs': now,
+      };
 
-    await db.update('products', map, where: 'id = ?', whereArgs: [id]);
+      await tx.update('products', map, where: 'id = ?', whereArgs: [id]);
+
+      // Fshi variantet e vjetra dhe krijo të rejat
+      if (autoGenerateVariants && (category != null || subcategory != null)) {
+        await tx.delete('product_variants', where: 'productId = ?', whereArgs: [id]);
+
+        for (final entry in sizeStock.entries) {
+          final size = entry.key;
+          final qty = entry.value;
+          if (qty > 0) {
+            final variantSku = generateVariantSku(
+              category: category,
+              subcategory: subcategory,
+              productName: name,
+              size: size.toString(),
+            );
+
+            // Kontrollo uniqueness (përveç variantet e këtij produkti që po fshihen)
+            final existing = await tx.query(
+              'product_variants',
+              where: 'sku = ? AND productId != ?',
+              whereArgs: [variantSku, id],
+              limit: 1,
+            );
+            if (existing.isNotEmpty) {
+              throw Exception('SKU ekziston tashmë: $variantSku');
+            }
+
+            await tx.insert('product_variants', {
+              'productId': id,
+              'sku': variantSku,
+              'size': size.toString(),
+              'quantity': qty,
+              'barcode': serialNumber,
+              'createdAtMs': now,
+              'updatedAtMs': now,
+            });
+          }
+        }
+      }
+    });
   }
 
   Future<void> deleteProduct(int id) async {
-    final db = await _open();
-    await db.delete('products', where: 'id = ?', whereArgs: [id]);
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    await db.transaction((tx) async {
+      // Fshi variantet (CASCADE do ta bëjë automatikisht, por e bëjmë eksplicit)
+      await tx.delete('product_variants', where: 'productId = ?', whereArgs: [id]);
+      await tx.delete('products', where: 'id = ?', whereArgs: [id]);
+    });
   }
 
   Future<void> toggleActive(int id, bool active) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     await db.update(
       'products',
       {
@@ -1109,7 +1374,8 @@ class LocalApi {
   }
 
   Future<List<Product>> searchProductsBySerialOrName(String q) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final s = q.trim();
     if (s.isEmpty) return [];
     final like = '%$s%';
@@ -1131,7 +1397,8 @@ class LocalApi {
     required int size,
     required int userId,
   }) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final now = DateTime.now();
     final nowMs = now.millisecondsSinceEpoch;
 
@@ -1215,7 +1482,8 @@ class LocalApi {
   }) async {
     if (cartItems.isEmpty) throw Exception('Cart is empty.');
 
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final now = DateTime.now();
     final nowMs = now.millisecondsSinceEpoch;
 
@@ -1253,27 +1521,78 @@ class LocalApi {
 
       // Update stock
       for (final item in cartItems) {
-        final prodRows = await tx.query(
-          'products',
-          where: 'id = ?',
-          whereArgs: [item.product.id],
-          limit: 1,
-        );
-        final p0 = Product.fromRow(prodRows.first);
-        final map = Map<int, int>.from(p0.sizeStock);
-        map[item.size] = (map[item.size] ?? 0) - item.quantity;
-        final newTotal = _totalStock(map);
+        // ✅ NEW: Nëse është variant, zbrit stokun te variant
+        if (item.isVariant && item.variantId != null) {
+          final variantRows = await tx.query(
+            'product_variants',
+            where: 'id = ?',
+            whereArgs: [item.variantId],
+            limit: 1,
+          );
+          if (variantRows.isNotEmpty) {
+            final variant = ProductVariant.fromRow(variantRows.first);
+            final newQty = variant.quantity - item.quantity;
+            
+            await tx.update(
+              'product_variants',
+              {
+                'quantity': newQty,
+                'updatedAtMs': nowMs,
+              },
+              where: 'id = ?',
+              whereArgs: [item.variantId],
+            );
+            
+            // ✅ Përditëso edhe produktin bazë (sizeStockJson) për backward compatibility
+            final prodRows = await tx.query(
+              'products',
+              where: 'id = ?',
+              whereArgs: [item.product.id],
+              limit: 1,
+            );
+            if (prodRows.isNotEmpty) {
+              final p0 = Product.fromRow(prodRows.first);
+              final map = Map<int, int>.from(p0.sizeStock);
+              final sizeInt = int.tryParse(variant.size) ?? item.size;
+              map[sizeInt] = (map[sizeInt] ?? 0) - item.quantity;
+              final newTotal = _totalStock(map);
+              
+              await tx.update(
+                'products',
+                {
+                  'sizeStockJson': _encodeSizeStock(map),
+                  'stockQty': newTotal,
+                  'updatedAtMs': nowMs,
+                },
+                where: 'id = ?',
+                whereArgs: [item.product.id],
+              );
+            }
+          }
+        } else {
+          // Legacy: zbrit nga sizeStock
+          final prodRows = await tx.query(
+            'products',
+            where: 'id = ?',
+            whereArgs: [item.product.id],
+            limit: 1,
+          );
+          final p0 = Product.fromRow(prodRows.first);
+          final map = Map<int, int>.from(p0.sizeStock);
+          map[item.size] = (map[item.size] ?? 0) - item.quantity;
+          final newTotal = _totalStock(map);
 
-        await tx.update(
-          'products',
-          {
-            'sizeStockJson': _encodeSizeStock(map),
-            'stockQty': newTotal,
-            'updatedAtMs': nowMs,
-          },
-          where: 'id = ?',
-          whereArgs: [item.product.id],
-        );
+          await tx.update(
+            'products',
+            {
+              'sizeStockJson': _encodeSizeStock(map),
+              'stockQty': newTotal,
+              'updatedAtMs': nowMs,
+            },
+            where: 'id = ?',
+            whereArgs: [item.product.id],
+          );
+        }
       }
 
       total = round2(total);
@@ -1322,7 +1641,8 @@ class LocalApi {
   // ================= REVERT =================
 
   Future<void> revertSale({required int saleId}) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
     await db.transaction((tx) async {
@@ -1404,7 +1724,8 @@ class LocalApi {
   }
 
   Future<void> revertInvestment({required int investId}) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
     final rows = await db.query(
@@ -1427,7 +1748,8 @@ class LocalApi {
   }
 
   Future<void> revertExpense({required int expenseId}) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
     final rows = await db.query(
@@ -1452,7 +1774,8 @@ class LocalApi {
   // ================= INVESTMENTS =================
 
   Future<void> addInvestment({required double amount, String? note}) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final now = DateTime.now();
     final nowMs = now.millisecondsSinceEpoch;
 
@@ -1471,7 +1794,8 @@ class LocalApi {
   Future<List<Map<String, Object?>>> getInvestments({
     String? monthKeyFilter,
   }) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     if (monthKeyFilter == null) {
       return db.query('investments', orderBy: 'createdAtMs DESC', limit: 200);
     }
@@ -1492,7 +1816,8 @@ class LocalApi {
     required double amount,
     String? note,
   }) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final now = DateTime.now();
     final nowMs = now.millisecondsSinceEpoch;
 
@@ -1513,7 +1838,8 @@ class LocalApi {
   }
 
   Future<List<ExpenseDoc>> getExpenses({String? monthKeyFilter}) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final rows = monthKeyFilter == null
         ? await db.query('expenses', orderBy: 'createdAtMs DESC', limit: 300)
         : await db.query(
@@ -1529,7 +1855,8 @@ class LocalApi {
   // ================= ADMIN / STATS =================
 
   Future<List<String>> getMonthOptions() async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
 
     final rows1 = await db.rawQuery(
       'SELECT DISTINCT monthKey FROM sales ORDER BY monthKey DESC',
@@ -1562,7 +1889,8 @@ class LocalApi {
   }
 
   Future<AdminStats> getAdminStats({required String selectedMonth}) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final todayK = dayKey(DateTime.now());
 
     // SALES (no reverted)
@@ -1667,7 +1995,8 @@ class LocalApi {
   }
 
   Future<List<ActivityItem>> getActivity({int limit = 60}) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
 
     final sales = await db.rawQuery(
       '''
@@ -1770,7 +2099,8 @@ class LocalApi {
   }
 
   Future<YearStats> getYearStats(int year) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final yPrefix = '$year-';
 
     final s = await db.rawQuery(
@@ -1820,7 +2150,8 @@ class LocalApi {
     required String scope, // 'day' | 'month' | 'total'
     String? monthKeyFilter,
   }) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
 
     final where = <String>['revertedAtMs IS NULL', 'userId = ?'];
     final args = <Object?>[userId];
@@ -1859,7 +2190,8 @@ WHERE ${where.join(' AND ')}
 
   /// ✅ A eshte barazu sot?
   Future<bool> isWorkerSettledToday(int userId) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final today = dayKey(DateTime.now());
 
     // Prefer: settlements table
@@ -1877,7 +2209,8 @@ WHERE ${where.join(' AND ')}
   /// - printon POS80
   /// - pastaj shënon sales si settled + inserton settlement record
   Future<void> settleWorkerToday(int userId, String workerName) async {
-    final db = await _open();
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final today = dayKey(DateTime.now());
     final now = DateTime.now();
     final nowMs = now.millisecondsSinceEpoch;
@@ -1950,5 +2283,407 @@ WHERE ${where.join(' AND ')}
         'settledAtMs': nowMs,
       });
     });
+  }
+
+  // ================= DASHBOARD HELPERS =================
+
+  /// Get daily sales data for the last N days
+  Future<List<Map<String, dynamic>>> getDailySalesData({int days = 7}) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final now = DateTime.now();
+    final data = <Map<String, dynamic>>[];
+
+    for (int i = days - 1; i >= 0; i--) {
+      final date = now.subtract(Duration(days: i));
+      final dayK = dayKey(date);
+      
+      final rows = await db.rawQuery(
+        'SELECT COALESCE(SUM(total),0) as total, COUNT(*) as count '
+        'FROM sales WHERE dayKey = ? AND revertedAtMs IS NULL',
+        [dayK],
+      );
+      
+      final total = ((rows.first['total'] as num?) ?? 0).toDouble();
+      final count = (rows.first['count'] as int?) ?? 0;
+      
+      data.add({
+        'date': date,
+        'dayKey': dayK,
+        'total': total,
+        'count': count,
+      });
+    }
+
+    return data;
+  }
+
+  /// Get best selling products
+  Future<List<Map<String, dynamic>>> getBestSellingProducts({int limit = 10}) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    
+    final rows = await db.rawQuery('''
+      SELECT 
+        si.productId,
+        p.name,
+        p.imagePath,
+        p.price,
+        p.discountPercent,
+        p.stockQty,
+        SUM(si.qty) as totalSold
+      FROM sale_items si
+      INNER JOIN products p ON si.productId = p.id
+      INNER JOIN sales s ON si.saleId = s.id
+      WHERE s.revertedAtMs IS NULL
+      GROUP BY si.productId
+      ORDER BY totalSold DESC
+      LIMIT ?
+    ''', [limit]);
+
+    return rows.map((r) => {
+      'productId': r['productId'] as int,
+      'name': r['name'] as String? ?? '',
+      'imagePath': r['imagePath'] as String?,
+      'price': ((r['price'] as num?) ?? 0).toDouble(),
+      'discountPercent': ((r['discountPercent'] as num?) ?? 0).toDouble(),
+      'stockQty': (r['stockQty'] as int?) ?? 0,
+      'totalSold': (r['totalSold'] as int?) ?? 0,
+    }).toList();
+  }
+
+  /// Get recent sales for payments list
+  Future<List<Map<String, dynamic>>> getRecentSales({int limit = 5}) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    
+    final rows = await db.rawQuery('''
+      SELECT 
+        id,
+        invoiceNo,
+        total,
+        createdAtMs,
+        userId
+      FROM sales
+      WHERE revertedAtMs IS NULL
+      ORDER BY createdAtMs DESC
+      LIMIT ?
+    ''', [limit]);
+
+    return rows.map((r) => {
+      'id': r['id'] as int,
+      'invoiceNo': r['invoiceNo'] as String? ?? '',
+      'total': ((r['total'] as num?) ?? 0).toDouble(),
+      'createdAtMs': (r['createdAtMs'] as int?) ?? 0,
+      'userId': r['userId'] as int?,
+    }).toList();
+  }
+
+  // ================= FITIMET / SALES LIST =================
+  
+  Future<List<Map<String, dynamic>>> getSalesForPeriod({
+    required String period, // 'today', 'week', 'month'
+  }) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final now = DateTime.now();
+    
+    String whereClause = 'revertedAtMs IS NULL';
+    List<dynamic> args = [];
+    
+    if (period == 'today') {
+      final todayK = dayKey(now);
+      whereClause += ' AND dayKey = ?';
+      args.add(todayK);
+    } else if (period == 'week') {
+      final weekAgo = now.subtract(const Duration(days: 7));
+      final weekAgoMs = weekAgo.millisecondsSinceEpoch;
+      whereClause += ' AND createdAtMs >= ?';
+      args.add(weekAgoMs);
+    } else if (period == 'month') {
+      final monthK = monthKey(now);
+      whereClause += ' AND monthKey = ?';
+      args.add(monthK);
+    }
+    
+    final rows = await db.rawQuery('''
+      SELECT 
+        id,
+        invoiceNo,
+        total,
+        profitTotal,
+        createdAtMs,
+        userId
+      FROM sales
+      WHERE $whereClause
+      ORDER BY createdAtMs DESC
+    ''', args);
+
+    return rows.map((r) => {
+      'id': r['id'] as int,
+      'invoiceNo': r['invoiceNo'] as String? ?? '',
+      'total': ((r['total'] as num?) ?? 0).toDouble(),
+      'profitTotal': ((r['profitTotal'] as num?) ?? 0).toDouble(),
+      'createdAtMs': (r['createdAtMs'] as int?) ?? 0,
+      'userId': r['userId'] as int?,
+    }).toList();
+  }
+
+  Future<Map<String, double>> getProfitSummary({
+    required String period, // 'today', 'week', 'month'
+  }) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final now = DateTime.now();
+    
+    String whereClause = 'revertedAtMs IS NULL';
+    List<dynamic> args = [];
+    
+    if (period == 'today') {
+      final todayK = dayKey(now);
+      whereClause += ' AND dayKey = ?';
+      args.add(todayK);
+    } else if (period == 'week') {
+      final weekAgo = now.subtract(const Duration(days: 7));
+      final weekAgoMs = weekAgo.millisecondsSinceEpoch;
+      whereClause += ' AND createdAtMs >= ?';
+      args.add(weekAgoMs);
+    } else if (period == 'month') {
+      final monthK = monthKey(now);
+      whereClause += ' AND monthKey = ?';
+      args.add(monthK);
+    }
+    
+    // Get sales totals
+    final salesRows = await db.rawQuery('''
+      SELECT 
+        COALESCE(SUM(total),0) as totalSales,
+        COALESCE(SUM(profitTotal),0) as totalProfit,
+        COUNT(*) as count
+      FROM sales
+      WHERE $whereClause
+    ''', args);
+    
+    final totalSales = ((salesRows.first['totalSales'] as num?) ?? 0).toDouble();
+    final totalProfit = ((salesRows.first['totalProfit'] as num?) ?? 0).toDouble();
+    final count = (salesRows.first['count'] as int?) ?? 0;
+    
+    // Get expenses for period
+    String expenseWhere = '1=1';
+    List<dynamic> expenseArgs = [];
+    
+    if (period == 'today') {
+      final todayK = dayKey(now);
+      expenseWhere += ' AND dayKey = ?';
+      expenseArgs.add(todayK);
+    } else if (period == 'week') {
+      final weekAgo = now.subtract(const Duration(days: 7));
+      final weekAgoMs = weekAgo.millisecondsSinceEpoch;
+      expenseWhere += ' AND createdAtMs >= ?';
+      expenseArgs.add(weekAgoMs);
+    } else if (period == 'month') {
+      final monthK = monthKey(now);
+      expenseWhere += ' AND monthKey = ?';
+      expenseArgs.add(monthK);
+    }
+    
+    final expenseRows = await db.rawQuery('''
+      SELECT COALESCE(SUM(amount),0) as totalExpenses
+      FROM expenses
+      WHERE $expenseWhere
+    ''', expenseArgs);
+    
+    final totalExpenses = ((expenseRows.first['totalExpenses'] as num?) ?? 0).toDouble();
+    final netProfit = totalProfit - totalExpenses;
+    
+    return {
+      'totalSales': totalSales,
+      'totalProfit': totalProfit,
+      'totalExpenses': totalExpenses,
+      'netProfit': netProfit,
+      'count': count.toDouble(),
+    };
+  }
+
+  // ================= SHPENZIMET =================
+  
+  Future<List<Map<String, dynamic>>> getExpensesForPeriod({
+    required String period, // 'today', 'week', 'month'
+    String? categoryFilter, // null = all, or specific category
+  }) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final now = DateTime.now();
+    
+    String whereClause = 'revertedAtMs IS NULL';
+    List<dynamic> args = [];
+    
+    if (period == 'today') {
+      final todayK = dayKey(now);
+      whereClause += ' AND dayKey = ?';
+      args.add(todayK);
+    } else if (period == 'week') {
+      final weekAgo = now.subtract(const Duration(days: 7));
+      final weekAgoMs = weekAgo.millisecondsSinceEpoch;
+      whereClause += ' AND createdAtMs >= ?';
+      args.add(weekAgoMs);
+    } else if (period == 'month') {
+      final monthK = monthKey(now);
+      whereClause += ' AND monthKey = ?';
+      args.add(monthK);
+    }
+    
+    if (categoryFilter != null && categoryFilter.isNotEmpty) {
+      whereClause += ' AND category = ?';
+      args.add(categoryFilter);
+    }
+    
+    final expenseRows = await db.rawQuery('''
+      SELECT 
+        id,
+        category,
+        amount,
+        note,
+        createdAtMs,
+        'expense' as type
+      FROM expenses
+      WHERE $whereClause
+      ORDER BY createdAtMs DESC
+    ''', args);
+    
+    // Get investments (blerje malli)
+    String invWhere = 'revertedAtMs IS NULL';
+    List<dynamic> invArgs = [];
+    
+    if (period == 'today') {
+      final todayK = dayKey(now);
+      invWhere += ' AND dayKey = ?';
+      invArgs.add(todayK);
+    } else if (period == 'week') {
+      final weekAgo = now.subtract(const Duration(days: 7));
+      final weekAgoMs = weekAgo.millisecondsSinceEpoch;
+      invWhere += ' AND createdAtMs >= ?';
+      invArgs.add(weekAgoMs);
+    } else if (period == 'month') {
+      final monthK = monthKey(now);
+      invWhere += ' AND monthKey = ?';
+      invArgs.add(monthK);
+    }
+    
+    final investRows = await db.rawQuery('''
+      SELECT 
+        id,
+        amount,
+        note,
+        createdAtMs,
+        'investment' as type
+      FROM investments
+      WHERE $invWhere
+      ORDER BY createdAtMs DESC
+    ''', invArgs);
+
+    // Combine both lists
+    final allExpenses = <Map<String, dynamic>>[];
+    
+    // Add expenses
+    for (final row in expenseRows) {
+      if (categoryFilter == null || categoryFilter == 'all' || categoryFilter.isEmpty) {
+        allExpenses.add({
+          'id': row['id'] as int,
+          'category': row['category'] as String,
+          'amount': ((row['amount'] as num?) ?? 0).toDouble(),
+          'note': row['note'] as String?,
+          'createdAtMs': (row['createdAtMs'] as int?) ?? 0,
+          'type': 'expense',
+        });
+      } else if (row['category'] == categoryFilter) {
+        allExpenses.add({
+          'id': row['id'] as int,
+          'category': row['category'] as String,
+          'amount': ((row['amount'] as num?) ?? 0).toDouble(),
+          'note': row['note'] as String?,
+          'createdAtMs': (row['createdAtMs'] as int?) ?? 0,
+          'type': 'expense',
+        });
+      }
+    }
+    
+    // Add investments if no category filter or if filter is 'Blerje Malli'
+    if (categoryFilter == null || categoryFilter == 'all' || categoryFilter.isEmpty || categoryFilter == 'Blerje Malli') {
+      for (final row in investRows) {
+        allExpenses.add({
+          'id': row['id'] as int,
+          'category': 'Blerje Malli',
+          'amount': ((row['amount'] as num?) ?? 0).toDouble(),
+          'note': row['note'] as String?,
+          'createdAtMs': (row['createdAtMs'] as int?) ?? 0,
+          'type': 'investment',
+        });
+      }
+    }
+    
+    // Sort by date descending
+    allExpenses.sort((a, b) => (b['createdAtMs'] as int).compareTo(a['createdAtMs'] as int));
+    
+    return allExpenses;
+  }
+
+  Future<Map<String, double>> getExpensesSummary({
+    required String period, // 'today', 'week', 'month'
+  }) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final now = DateTime.now();
+    
+    String whereClause = 'revertedAtMs IS NULL';
+    List<dynamic> args = [];
+    
+    if (period == 'today') {
+      final todayK = dayKey(now);
+      whereClause += ' AND dayKey = ?';
+      args.add(todayK);
+    } else if (period == 'week') {
+      final weekAgo = now.subtract(const Duration(days: 7));
+      final weekAgoMs = weekAgo.millisecondsSinceEpoch;
+      whereClause += ' AND createdAtMs >= ?';
+      args.add(weekAgoMs);
+    } else if (period == 'month') {
+      final monthK = monthKey(now);
+      whereClause += ' AND monthKey = ?';
+      args.add(monthK);
+    }
+    
+    // Get expenses
+    final expenseRows = await db.rawQuery('''
+      SELECT 
+        COALESCE(SUM(amount),0) as total,
+        COUNT(*) as count
+      FROM expenses
+      WHERE $whereClause
+    ''', args);
+    
+    // Get investments
+    final investRows = await db.rawQuery('''
+      SELECT 
+        COALESCE(SUM(amount),0) as total,
+        COUNT(*) as count
+      FROM investments
+      WHERE $whereClause
+    ''', args);
+    
+    final expensesTotal = ((expenseRows.first['total'] as num?) ?? 0).toDouble();
+    final expensesCount = (expenseRows.first['count'] as int?) ?? 0;
+    
+    final investTotal = ((investRows.first['total'] as num?) ?? 0).toDouble();
+    final investCount = (investRows.first['count'] as int?) ?? 0;
+    
+    return {
+      'expensesTotal': expensesTotal,
+      'expensesCount': expensesCount.toDouble(),
+      'investTotal': investTotal,
+      'investCount': investCount.toDouble(),
+      'grandTotal': expensesTotal + investTotal,
+      'totalCount': (expensesCount + investCount).toDouble(),
+    };
   }
 }

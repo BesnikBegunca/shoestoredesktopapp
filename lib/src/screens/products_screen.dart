@@ -55,11 +55,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     if (ok) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: Image.file(
           File(path!),
-          width: 44,
-          height: 44,
+          width: 72,
+          height: 72,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _placeholderThumb(),
         ),
@@ -70,15 +70,29 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Widget _placeholderThumb() {
     return Container(
-      width: 44,
-      height: 44,
+      width: 72,
+      height: 72,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: AppTheme.surface2.withOpacity(0.45),
-        border: Border.all(color: AppTheme.stroke),
+        borderRadius: BorderRadius.circular(14),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.grey.shade200,
+            Colors.grey.shade100,
+          ],
+        ),
+        border: Border.all(
+          color: Colors.black.withOpacity(0.08),
+          width: 1,
+        ),
       ),
       alignment: Alignment.center,
-      child: const Icon(Icons.inventory_2_outlined, color: AppTheme.text),
+      child: Icon(
+        Icons.inventory_2_outlined,
+        color: Colors.black87.withOpacity(0.4),
+        size: 28,
+      ),
     );
   }
 
@@ -96,6 +110,413 @@ class _ProductsScreenState extends State<ProductsScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _deleteProduct(Product product) async {
+    // Konfirmimi
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Fshi Produktin'),
+        content: Text('A jeni të sigurt që dëshironi të fshini "${product.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Anulo'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Fshi'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await LocalApi.I.deleteProduct(product.id);
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Produkti "${product.name}" u fshi me sukses'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Reload list
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gabim në fshirje: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _openRegistrationMethodDialog() async {
+    await showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Zgjedh mënyrën e regjistrimit',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 24,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 32),
+              // Skanim Barcode Option
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openBarcodeScanForm();
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.black87.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.black87.withOpacity(0.1),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.black87.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.qr_code_scanner,
+                            color: Colors.black87,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Skanim Barcode',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 17,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Regjistro produktin duke skanuar barcode',
+                                style: TextStyle(
+                                  color: Colors.black87.withOpacity(0.6),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          color: Colors.black87,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Regjistrim Manual Option
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openForm();
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.black87.withOpacity(0.03),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.black87.withOpacity(0.1),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.black87.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.edit_note,
+                            color: Colors.black87,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Regjistrim Manual',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 17,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Regjistro produktin manualisht',
+                                style: TextStyle(
+                                  color: Colors.black87.withOpacity(0.6),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          color: Colors.black87,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Cancel Button
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text(
+                    'Anulo',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openBarcodeScanForm() async {
+    final barcodeController = TextEditingController();
+    
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Container(
+          width: 400,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Skano Barcode',
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 20,
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: barcodeController,
+                autofocus: true,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Barcode / SKU / Serial Number',
+                  labelStyle: const TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  hintText: 'Skano ose shkruaj barcode',
+                  hintStyle: TextStyle(
+                    color: Colors.black87.withOpacity(0.4),
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.qr_code_scanner,
+                    color: Colors.black87,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.black87.withOpacity(0.2),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.black87.withOpacity(0.2),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Colors.black87,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                onSubmitted: (value) async {
+                  if (value.trim().isNotEmpty) {
+                    Navigator.pop(context);
+                    await _handleBarcodeScan(value.trim());
+                  }
+                },
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Anulo',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Material(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      onTap: () async {
+                        final barcode = barcodeController.text.trim();
+                        if (barcode.isEmpty) return;
+                        Navigator.pop(context);
+                        await _handleBarcodeScan(barcode);
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        child: const Text(
+                          'Vazhdo',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    barcodeController.dispose();
+  }
+
+  Future<void> _handleBarcodeScan(String barcode) async {
+    try {
+      // Kërko produktin me këtë barcode/SKU/Serial
+      final products = await LocalApi.I.getProducts();
+      Product? foundProduct;
+      
+      for (final product in products) {
+        if (product.sku?.toLowerCase() == barcode.toLowerCase() ||
+            product.serialNumber?.toLowerCase() == barcode.toLowerCase()) {
+          foundProduct = product;
+          break;
+        }
+      }
+
+      if (foundProduct != null) {
+        // Produkti ekziston, hape për editim
+        await _openForm(editing: foundProduct);
+      } else {
+        // Produkti nuk ekziston, hape formë të re me barcode të plotësuar
+        await _openFormWithBarcode(barcode);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gabim: $e')),
+      );
+    }
+  }
+
+  Future<void> _openFormWithBarcode(String barcode) async {
+    final res = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _ProductFormDialog(
+        editing: null,
+        prefillBarcode: barcode,
+      ),
+    );
+    if (res == true) _load();
   }
 
   Future<void> _openForm({Product? editing}) async {
@@ -167,26 +588,82 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bg,
-      appBar: AppBar(
-        backgroundColor: AppTheme.surface2,
-        foregroundColor: AppTheme.text,
-        title: const Text(
-          'Produktet',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
-        actions: [
-          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
-          const SizedBox(width: 6),
-        ],
-      ),
-      floatingActionButton: widget.readonly
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: () => _openForm(),
-              label: const Text('Shto'),
-              icon: const Icon(Icons.add),
+      body: SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: Column(
+          children: [
+            // Header - Identik me Shtija Ditore
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppTheme.primaryPurple,
+                          AppTheme.primaryPurple.withOpacity(0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.primaryPurple.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.inventory_2,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Stoku/Produktet',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.black,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Menaxho produktet dhe stokun',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-      body: _loading
+            // Body Content
+            Expanded(
+              child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty
           ? const Center(
@@ -195,131 +672,68 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 style: TextStyle(color: AppTheme.text),
               ),
             )
-          : ListView.separated(
-              padding: const EdgeInsets.all(12),
-              itemCount: _items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (_, i) {
-                final p0 = _items[i];
-                final hasDisc = p0.discountPercent > 0;
-
-                return Card(
-                  color: AppTheme.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: const BorderSide(color: AppTheme.stroke),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
+          : Container(
+              color: Colors.white,
+              child: Column(
+                children: [
+                  // Table Header
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.grey.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                    ),
                     child: Row(
                       children: [
-                        _thumb(p0),
-                        const SizedBox(width: 12),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                p0.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.text,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                p0.serialNumber ?? p0.sku ?? '—',
-                                style: TextStyle(
-                                  color: AppTheme.muted,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 6,
-                                children: [
-                                  _pill(
-                                    'Stok: ${p0.stockQty}',
-                                    p0.stockQty > 0 ? Colors.green : Colors.red,
-                                  ),
-                                  _pill(
-                                    p0.active ? 'Active' : 'OFF',
-                                    p0.active ? Colors.green : Colors.grey,
-                                  ),
-                                  if (hasDisc)
-                                    _pill(
-                                      '-${p0.discountPercent.toStringAsFixed(0)}%',
-                                      Colors.orange,
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              _sizesInline(p0), // ✅ shfaq edhe 0-3M...
-                            ],
-                          ),
+                          flex: 3,
+                          child: _tableHeader('Produkti'),
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            if (hasDisc)
-                              Text(
-                                '€${p0.price.toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  color: AppTheme.muted,
-                                  decoration: TextDecoration.lineThrough,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            Text(
-                              '€${p0.finalPrice.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                color: AppTheme.text,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'Active',
-                                  onPressed: () => _toggleActive(p0),
-                                  icon: Icon(
-                                    p0.active
-                                        ? Icons.toggle_on
-                                        : Icons.toggle_off,
-                                    color: AppTheme.text,
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: 'Edit',
-                                  onPressed: () => _openForm(editing: p0),
-                                  icon: const Icon(
-                                    Icons.edit,
-                                    color: AppTheme.text,
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: 'Delete',
-                                  onPressed: () => _confirmDelete(p0),
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: AppTheme.text,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                        Expanded(
+                          flex: 2,
+                          child: _tableHeader('Barcode'),
                         ),
+                        Expanded(
+                          flex: 1,
+                          child: _tableHeader('Çmimi'),
+                        ),
+                        Expanded(
+                          flex: 1,
+                          child: _tableHeader('Sasia'),
+                        ),
+                        const SizedBox(width: 60), // Space for delete button
                       ],
                     ),
                   ),
-                );
-              },
+                  // Table Rows
+                  Expanded(
+                    child: ListView.separated(
+                      padding: EdgeInsets.zero,
+                      itemCount: _items.length,
+                      separatorBuilder: (_, __) => Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Colors.grey.withOpacity(0.15),
+                      ),
+                      itemBuilder: (_, i) {
+                        final p0 = _items[i];
+                        final hasDisc = p0.discountPercent > 0;
+                        return _tableRow(p0, hasDisc);
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -339,8 +753,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     if (sizes.isEmpty) return const SizedBox.shrink();
 
     return Wrap(
-      spacing: 6,
-      runSpacing: 6,
+      spacing: 8,
+      runSpacing: 8,
       children: [
         for (final s in sizes) _sizeChip(_labelForSizeKey(s), p0.qtyForSize(s)),
       ],
@@ -349,32 +763,185 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Widget _sizeChip(String label, int qty) {
     final ok = qty > 0;
-    final c = ok ? Colors.green : Colors.red;
+    final c = ok ? const Color(0xFF10B981) : const Color(0xFFEF4444);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
       decoration: BoxDecoration(
         color: c.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: c.withOpacity(0.35)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: c.withOpacity(0.4),
+          width: 1,
+        ),
       ),
-      child: Text(
-        '$label: $qty',
-        style: TextStyle(color: c, fontWeight: FontWeight.w900, fontSize: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: c,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: c.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '$qty',
+              style: TextStyle(
+                color: c,
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionButton({
+    required IconData icon,
+    required Color color,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: color.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tableHeader(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontWeight: FontWeight.w900,
+        color: Colors.black87,
+        fontSize: 14,
+        letterSpacing: 0.2,
+      ),
+    );
+  }
+
+  Widget _tableRow(Product p0, bool hasDisc) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Row(
+        children: [
+          // Produkti
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  p0.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black87,
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Barcode
+          Expanded(
+            flex: 2,
+            child: Text(
+              p0.serialNumber ?? p0.sku ?? '—',
+              style: TextStyle(
+                color: Colors.black87.withOpacity(0.7),
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          // Çmimi
+          Expanded(
+            flex: 1,
+            child: Text(
+              '€${p0.finalPrice.toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                color: Colors.black87,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          // Sasia (vetëm shfaqje)
+          Expanded(
+            flex: 1,
+            child: Text(
+              '${p0.stockQty}',
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          // Delete Button
+          SizedBox(
+            width: 60,
+            child: IconButton(
+              onPressed: widget.readonly ? null : () => _deleteProduct(p0),
+              icon: Icon(
+                Icons.delete_outline,
+                color: widget.readonly ? Colors.grey : Colors.red.shade700,
+                size: 20,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _pill(String t, Color c) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: c.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: c.withOpacity(0.35)),
+        color: c.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: c.withOpacity(0.4),
+          width: 1,
+        ),
       ),
       child: Text(
         t,
-        style: TextStyle(color: c, fontWeight: FontWeight.w800, fontSize: 12),
+        style: TextStyle(
+          color: c,
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -388,7 +955,8 @@ enum ProductKind { shoes, clothes }
 
 class _ProductFormDialog extends StatefulWidget {
   final Product? editing;
-  const _ProductFormDialog({required this.editing});
+  final String? prefillBarcode;
+  const _ProductFormDialog({required this.editing, this.prefillBarcode});
 
   @override
   State<_ProductFormDialog> createState() => _ProductFormDialogState();
@@ -441,8 +1009,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     final p0 = widget.editing;
 
     nameC = TextEditingController(text: p0?.name ?? '');
-    skuC = TextEditingController(text: p0?.sku ?? '');
-    serialC = TextEditingController(text: p0?.serialNumber ?? '');
+    skuC = TextEditingController(text: p0?.sku ?? widget.prefillBarcode ?? '');
+    serialC = TextEditingController(text: p0?.serialNumber ?? widget.prefillBarcode ?? '');
     priceC = TextEditingController(text: p0 == null ? '' : p0.price.toString());
     purchaseC = TextEditingController(
       text: p0?.purchasePrice?.toString() ?? '',
@@ -727,42 +1295,111 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     final sizeStockPreview = _collectSizeStock();
     final totalStock = _totalStock(sizeStockPreview);
 
-    return AlertDialog(
-      backgroundColor: AppTheme.surface,
-      surfaceTintColor: Colors.transparent,
-      title: Text(
-        isEdit ? 'Ndrysho produkt' : 'Shto produkt',
-        style: const TextStyle(
-          color: AppTheme.text,
-          fontWeight: FontWeight.w900,
-        ),
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
       ),
-      content: SizedBox(
-        width: 680,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: nameC,
-                  style: const TextStyle(color: AppTheme.text),
-                  decoration: const InputDecoration(
-                    labelText: 'Emri i produktit',
-                    hintText: 'p.sh. Nike Air Max',
-                  ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Shkruje emrin.' : null,
-                ),
+      child: Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isEdit ? 'Ndrysho produkt' : 'Shto produkt',
+              style: const TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.w900,
+                fontSize: 28,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: 680,
+              height: 600,
+              child: Form(
+                key: _formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: nameC,
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Emri i produktit',
+                          labelStyle: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          hintText: 'p.sh. Nike Air Max',
+                          hintStyle: TextStyle(
+                            color: Colors.black87.withOpacity(0.4),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.black87,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? 'Shkruje emrin.' : null,
+                      ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: TextFormField(
                         controller: skuC,
-                        style: const TextStyle(color: AppTheme.text),
-                        decoration: const InputDecoration(
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        decoration: InputDecoration(
                           labelText: 'SKU (opsionale)',
+                          labelStyle: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.black87,
+                              width: 2,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -770,9 +1407,35 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     Expanded(
                       child: TextFormField(
                         controller: serialC,
-                        style: const TextStyle(color: AppTheme.text),
-                        decoration: const InputDecoration(
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        decoration: InputDecoration(
                           labelText: 'Nr. Serik (opsionale, UNIQUE)',
+                          labelStyle: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.black87,
+                              width: 2,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -784,12 +1447,38 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     Expanded(
                       child: TextFormField(
                         controller: priceC,
-                        style: const TextStyle(color: AppTheme.text),
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w600,
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Çmimi i shitjes (€)',
+                          labelStyle: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.black87,
+                              width: 2,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -797,12 +1486,38 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     Expanded(
                       child: TextFormField(
                         controller: purchaseC,
-                        style: const TextStyle(color: AppTheme.text),
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w600,
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Çmimi i blerjes (€) (ops.)',
+                          labelStyle: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.black87,
+                              width: 2,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -811,11 +1526,39 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: discountC,
-                  style: const TextStyle(color: AppTheme.text),
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: const InputDecoration(labelText: 'Zbritja (%)'),
+                  decoration: InputDecoration(
+                    labelText: 'Zbritja (%)',
+                    labelStyle: const TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.black87.withOpacity(0.2),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.black87.withOpacity(0.2),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Colors.black87,
+                        width: 2,
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 14),
 
@@ -830,7 +1573,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                             'Stoku sipas masave',
                             style: TextStyle(
                               fontWeight: FontWeight.w900,
-                              color: AppTheme.text,
+                              color: Colors.black87,
+                              fontSize: 17,
                             ),
                           ),
                           const Spacer(),
@@ -865,7 +1609,10 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                 if (kind == ProductKind.shoes)
                   _sizesGrid()
                 else
-                  _clothSizesGrid(),
+                  SizedBox(
+                    height: 300,
+                    child: _clothSizesGrid(),
+                  ),
 
                 const SizedBox(height: 14),
 
@@ -874,10 +1621,39 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     Expanded(
                       child: TextFormField(
                         controller: imagePathC,
-                        style: const TextStyle(color: AppTheme.text),
-                        decoration: const InputDecoration(
+                        style: const TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        decoration: InputDecoration(
                           labelText: 'Foto (ruhet automatikisht në app)',
+                          labelStyle: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w600,
+                          ),
                           hintText: r'C:\...\foto.png',
+                          hintStyle: TextStyle(
+                            color: Colors.black87.withOpacity(0.4),
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.black87.withOpacity(0.2),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.black87,
+                              width: 2,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -928,7 +1704,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                       'Active',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        color: AppTheme.text,
+                        color: Colors.black87,
+                        fontSize: 16,
                       ),
                     ),
                     const Spacer(),
@@ -938,25 +1715,60 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
                     ),
                   ],
                 ),
-              ],
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: saving ? null : () => Navigator.pop(context, false),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                            ),
+                            child: const Text(
+                              'Anulo',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Material(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(10),
+                            child: InkWell(
+                              onTap: saving ? null : _save,
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 14,
+                                ),
+                                child: Text(
+                                  saving ? 'Duke ruajt...' : (isEdit ? 'Ruaj' : 'Shto'),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: saving ? null : () => Navigator.pop(context, false),
-          child: const Text('Anulo'),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: AppTheme.success,
-            foregroundColor: Colors.white,
-          ),
-          onPressed: saving ? null : _save,
-          child: Text(saving ? 'Duke ruajt...' : (isEdit ? 'Ruaj' : 'Shto')),
-        ),
-      ],
     );
   }
 
@@ -965,25 +1777,28 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     required bool selected,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          color: selected
-              ? AppTheme.primaryPurple.withOpacity(0.22)
-              : AppTheme.surface2.withOpacity(0.35),
-          border: Border.all(
-            color: selected ? AppTheme.primaryPurple : AppTheme.stroke,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: selected ? Colors.black87 : Colors.black87.withOpacity(0.05),
+            border: Border.all(
+              color: selected ? Colors.black87 : Colors.black87.withOpacity(0.2),
+              width: selected ? 2 : 1,
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: AppTheme.text,
-            fontWeight: FontWeight.w900,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+            ),
           ),
         ),
       ),
@@ -1006,33 +1821,72 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
           rows.add(
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: color.withOpacity(0.35)),
-                color: color.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: ok ? Colors.black87.withOpacity(0.2) : Colors.black87.withOpacity(0.1),
+                  width: 1,
+                ),
+                color: Colors.white,
               ),
               child: Row(
                 children: [
-                  SizedBox(
-                    width: 34,
+                  Container(
+                    width: 36,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: ok ? Colors.black87.withOpacity(0.05) : Colors.black87.withOpacity(0.02),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Text(
                       '$size',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
-                        color: color,
+                        color: Colors.black87,
+                        fontSize: 14,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
                       controller: ctrl,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: InputDecoration(
                         isDense: true,
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: Colors.black87.withOpacity(0.2),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: Colors.black87.withOpacity(0.2),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Colors.black87,
+                            width: 2,
+                          ),
+                        ),
                         hintText: '0',
+                        hintStyle: TextStyle(
+                          color: Colors.black87.withOpacity(0.4),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                       ),
                       onChanged: (_) => setState(() {}),
                     ),
@@ -1069,33 +1923,70 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
           tiles.add(
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: color.withOpacity(0.35)),
-                color: color.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: ok ? Colors.black87.withOpacity(0.2) : Colors.black87.withOpacity(0.1),
+                  width: 1,
+                ),
+                color: Colors.white,
               ),
               child: Row(
                 children: [
-                  SizedBox(
-                    width: 64,
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: ok ? Colors.black87.withOpacity(0.05) : Colors.black87.withOpacity(0.02),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Text(
                       label,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontWeight: FontWeight.w900,
-                        color: color,
+                        color: Colors.black87,
+                        fontSize: 13,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
                       controller: ctrl,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: InputDecoration(
                         isDense: true,
-                        border: OutlineInputBorder(),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: Colors.black87.withOpacity(0.2),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(
+                            color: Colors.black87.withOpacity(0.2),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Colors.black87,
+                            width: 2,
+                          ),
+                        ),
                         hintText: '0',
+                        hintStyle: TextStyle(
+                          color: Colors.black87.withOpacity(0.4),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                       ),
                       onChanged: (_) => setState(() {}),
                     ),
@@ -1110,8 +2001,8 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
           crossAxisCount: cols,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: false,
+          physics: const AlwaysScrollableScrollPhysics(),
           children: tiles,
         );
       },
@@ -1120,18 +2011,21 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
 
   Widget _totalPill(String t) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: AppTheme.primaryPurple.withOpacity(0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppTheme.primaryPurple.withOpacity(0.35)),
+        color: Colors.black87.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.black87.withOpacity(0.2),
+          width: 1,
+        ),
       ),
       child: Text(
         t,
         style: const TextStyle(
-          color: AppTheme.text,
+          color: Colors.black87,
           fontWeight: FontWeight.w900,
-          fontSize: 12,
+          fontSize: 13,
         ),
       ),
     );

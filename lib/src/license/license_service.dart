@@ -13,7 +13,7 @@ class LicensePayload {
   final String product;
   final String customerId;
 
-  /// ✅ PËR TEST: këtu e përdorim si MINUTA (jo ditë)
+  /// Ditë validity (mund të jetë 30, 90, 365, etj.)
   final int validDays;
 
   final int? issuedAt;
@@ -96,17 +96,19 @@ class LicenseService {
       'WC_VcsdfzWFGHZxGtNYtQFEVn6Pq256dbIR4rdUiinE='; // replace with real private key
 
   static final LicenseService I = LicenseService._();
-  LicenseService._();
-
-  late final Ed25519 _algorithm;
-  late final SimplePublicKey _publicKey;
-
-  Future<void> init() async {
+  LicenseService._() {
     _algorithm = Ed25519();
     _publicKey = SimplePublicKey(
       base64Url.decode(_publicKeyBase64Url),
       type: KeyPairType.ed25519,
     );
+  }
+
+  late final Ed25519 _algorithm;
+  late final SimplePublicKey _publicKey;
+
+  Future<void> init() async {
+    // Initialization is now done in constructor
   }
 
   Future<String> _getLicenseFilePath() async {
@@ -163,12 +165,12 @@ class LicenseService {
       final payloadJson = jsonDecode(utf8.decode(payloadBytes));
       final payload = LicensePayload.fromJson(payloadJson);
 
-      // ✅ Validime (për test: 1 minutë)
+      // ✅ Validime
       if (payload.v != '1') return false;
       if (payload.product != 'shoe_store_manager') return false;
-
-      // ✅ Për 1 minutë test
-      if (payload.validDays != 1) return false;
+      
+      // validDays duhet të jetë pozitiv
+      if (payload.validDays <= 0) return false;
 
       return true;
     } catch (_) {
@@ -196,8 +198,8 @@ class LicenseService {
 
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    /// ✅ payload.validDays = MINUTA (për test)
-    final durationMs = payload.validDays * 60 * 1000;
+    /// ✅ payload.validDays = DITË (24 orë)
+    final durationMs = payload.validDays * 24 * 60 * 60 * 1000;
 
     final expiresAt = now + durationMs;
 
@@ -294,8 +296,12 @@ class LicenseService {
     return username == _devUsername && password == _devPassword;
   }
 
-  // ✅ Generate license key (për test: 1 minutë)
-  Future<String> generateLicenseKey(String customerId, {int? issuedAt}) async {
+  // ✅ Generate license key (konfigurueshme: 30, 90, 365 ditë, etj.)
+  Future<String> generateLicenseKey(
+    String customerId, {
+    required int validDays,
+    int? issuedAt,
+  }) async {
     final keyPair = await _algorithm.newKeyPairFromSeed(
       base64Url.decode(_privateKeyBase64Url),
     );
@@ -304,7 +310,7 @@ class LicenseService {
       'v': '1',
       'product': 'shoe_store_manager',
       'customerId': customerId,
-      'validDays': 1, // ✅ 1 MINUTË
+      'validDays': validDays, // ✅ KONFIGURUESHME
       if (issuedAt != null) 'issuedAt': issuedAt,
     };
 

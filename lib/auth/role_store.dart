@@ -10,6 +10,7 @@ class RoleStore {
 
   static const _kUserId = 'session_user_id';
   static const _kUsername = 'session_username';
+  static const _kBusinessId = 'session_business_id';
 
   static const _kAdminPin = 'admin_pin';
   static const String defaultAdminPin = '1234';
@@ -49,10 +50,19 @@ class RoleStore {
     required int userId,
     required String username,
     required UserRole role,
+    int? businessId,
   }) async {
     final sp = await SharedPreferences.getInstance();
     await sp.setInt(_kUserId, userId);
     await sp.setString(_kUsername, username.trim());
+    
+    // Store businessId if provided
+    if (businessId != null) {
+      await sp.setInt(_kBusinessId, businessId);
+    } else {
+      await sp.remove(_kBusinessId);
+    }
+    
     // keep role in same key for compatibility
     String roleStr;
     switch (role) {
@@ -89,6 +99,12 @@ class RoleStore {
     return t.isEmpty ? null : t;
   }
 
+  /// ✅ Merr businessId nga session
+  static Future<int?> getBusinessId() async {
+    final sp = await SharedPreferences.getInstance();
+    return sp.getInt(_kBusinessId);
+  }
+
   /// ✅ role from session; falls back to legacy role if session missing
   static Future<UserRole?> getSessionRole() async {
     final sp = await SharedPreferences.getInstance();
@@ -120,6 +136,7 @@ class RoleStore {
     await sp.remove(_kRole);
     await sp.remove(_kUserId);
     await sp.remove(_kUsername);
+    await sp.remove(_kBusinessId);
   }
 
   static Future<void> clear() async {
@@ -127,6 +144,7 @@ class RoleStore {
     await sp.remove(_kRole);
     await sp.remove(_kUserId);
     await sp.remove(_kUsername);
+    await sp.remove(_kBusinessId);
     await sp.remove(_kUsedMaster);
   }
 

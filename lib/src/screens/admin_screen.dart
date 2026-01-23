@@ -22,7 +22,7 @@ String monthKey(DateTime d) =>
 
 enum _ReportScope { day, month, year, total }
 
-enum _AdminTab { dashboard, users, license }
+enum _AdminTab { users }
 
 class AdminScreen extends StatefulWidget {
   final bool readonly;
@@ -36,7 +36,7 @@ class _AdminScreenState extends State<AdminScreen> {
   bool loading = true;
 
   // tabs
-  _AdminTab tab = _AdminTab.dashboard;
+  _AdminTab tab = _AdminTab.users;
 
   // DASHBOARD DATA
   List<String> monthOptions = [];
@@ -75,7 +75,7 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAll();
+    // Dashboard nuk përdoret më këtu, vetëm Users
   }
 
   @override
@@ -1414,31 +1414,18 @@ class _AdminScreenState extends State<AdminScreen> {
                   const SizedBox(height: 10),
                   const Divider(color: AppTheme.stroke, height: 1),
                   const SizedBox(height: 10),
-                  _sideBtn(
-                    icon: Icons.dashboard_rounded,
-                    label: 'Dashboard',
-                    active: tab == _AdminTab.dashboard,
-                    onTap: () => setState(() => tab = _AdminTab.dashboard),
-                  ),
-                  const SizedBox(height: 8),
-                  _sideBtn(
-                    icon: Icons.people_alt_rounded,
-                    label: 'Users',
-                    active: tab == _AdminTab.users,
-                    onTap: () async {
-                      setState(() => tab = _AdminTab.users);
-                      if (users.isEmpty) {
-                        await _loadUsers();
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  _sideBtn(
-                    icon: Icons.key,
-                    label: 'Licence Key Info',
-                    active: tab == _AdminTab.license,
-                    onTap: () => setState(() => tab = _AdminTab.license),
-                  ),
+                  // Users është i fshehur - nuk shfaqet në navigim
+                  // _sideBtn(
+                  //   icon: Icons.people_alt_rounded,
+                  //   label: 'Users',
+                  //   active: tab == _AdminTab.users,
+                  //   onTap: () async {
+                  //     setState(() => tab = _AdminTab.users);
+                  //     if (users.isEmpty) {
+                  //       await _loadUsers();
+                  //     }
+                  //   },
+                  // ),
                   const Spacer(),
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
@@ -1460,16 +1447,10 @@ class _AdminScreenState extends State<AdminScreen> {
 
           // Content
           Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: tab == _AdminTab.dashboard
-                        ? _dashboardView(s)
-                        : tab == _AdminTab.users
-                        ? _usersView()
-                        : _licenseView(),
-                  ),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: _usersView(),
+            ),
           ),
         ],
       ),

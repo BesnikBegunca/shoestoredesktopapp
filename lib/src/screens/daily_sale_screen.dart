@@ -1,6 +1,7 @@
 // daily_sale_screen.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shoe_store_manager/auth/role_store.dart';
 import 'package:shoe_store_manager/printing/receipt_builder.dart';
 import 'package:shoe_store_manager/printing/receipt_pdf_80mm.dart';
@@ -851,29 +852,36 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
           // Header - Single Row: Titull majtas, Barcode actions djathtas
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+            decoration: const BoxDecoration(
+              color: AppTheme.bgPage,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // MAJTAS: Titull
-                const Text(
-                  'Shitja Ditore',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.black,
-                    letterSpacing: -0.5,
-                  ),
+                // MAJTAS: Icon + Titull
+                Row(
+                  children: [
+                    SvgPicture.asset(
+                      'assets/icons/shitja_ditore.svg',
+                      width: 32,
+                      height: 32,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.black,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Text(
+                      'Shitja Ditore',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.black,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ],
                 ),
                 
                 // DJATHTAS: Barcode Actions (Ikona + Input + Butoni)
@@ -881,56 +889,65 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                   children: [
                     // Ikona Barcode
                     Container(
-                      padding: const EdgeInsets.all(10),
+                      width: 48,
+                      height: 48,
                       decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(10),
+                        color: AppTheme.btnPrimary,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                       ),
-                      child: const Icon(
-                        Icons.qr_code_scanner,
-                        color: Colors.white,
-                        size: 22,
+                      child: const Center(
+                        child: Icon(
+                          Icons.qr_code_scanner,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppTheme.space12),
                     
                     // Barcode Input
                     Container(
+                      height: 48,
                       width: 350,
                       decoration: BoxDecoration(
-                        color: AppTheme.bg,
-                        borderRadius: BorderRadius.circular(10),
+                        color: AppTheme.bgSurface,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                         border: Border.all(
-                          color: Colors.grey.withOpacity(0.3),
+                          color: AppTheme.borderLight,
                           width: 1.5,
                         ),
                       ),
+                      alignment: Alignment.center,
                       child: TextField(
                         controller: barcodeController,
                         autofocus: true,
+                        textAlignVertical: TextAlignVertical.center,
+                        cursorColor: Colors.black,
                         style: const TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.textPrimary,
                         ),
-                        decoration: InputDecoration(
+                        decoration: const InputDecoration(
                           hintText: 'Skano ose vendos barcode',
                           hintStyle: TextStyle(
-                            color: Colors.black.withOpacity(0.4),
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
+                            color: AppTheme.textTertiary,
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
                           ),
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
                           ),
-                          isDense: true,
+                          isDense: false,
                         ),
                         onSubmitted: _handleBarcodeScan,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppTheme.space12),
                     
                     // Butoni "+"
                     if (processing)
@@ -938,17 +955,17 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(10),
+                          color: AppTheme.borderLight,
+                          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                         ),
-                        child: const Center(
+                        child: Center(
                           child: SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
                               valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.black87,
+                                AppTheme.textPrimary,
                               ),
                             ),
                           ),
@@ -959,14 +976,14 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.black87,
-                          borderRadius: BorderRadius.circular(10),
+                          color: AppTheme.btnPrimary,
+                          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                         ),
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
                             onTap: () => _handleBarcodeScan(barcodeController.text),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
                             child: const Center(
                               child: Icon(
                                 Icons.add,
@@ -1307,21 +1324,8 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
     final hasItems = cart.isNotEmpty;
 
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: Colors.grey.withOpacity(0.2),
-            width: 1,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
+      decoration: const BoxDecoration(
+        color: AppTheme.bgPage,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
       child: Row(

@@ -1,6 +1,7 @@
 // license_info_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../auth/role_store.dart';
@@ -164,12 +165,16 @@ class _LicenseInfoScreenState extends State<LicenseInfoScreen> {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             const SizedBox(height: 20),
-                            Icon(
-                              Icons.vpn_key,
-                              size: 64,
-                              color: _licenseInfo!.isExpired
-                                  ? Colors.red
-                                  : AppTheme.primaryPurple,
+                            SvgPicture.asset(
+                              'assets/icons/licenca.svg',
+                              width: 64,
+                              height: 64,
+                              colorFilter: ColorFilter.mode(
+                                _licenseInfo!.isExpired
+                                    ? Colors.red
+                                    : AppTheme.textPrimary,
+                                BlendMode.srcIn,
+                              ),
                             ),
                             const SizedBox(height: 20),
                             Text(

@@ -391,51 +391,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             onSubmitted: (_) => _doLogin(),
           ),
-          const SizedBox(height: 16),
-          // Remember me & Forgot password
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: Checkbox(
-                      value: false,
-                      onChanged: (val) {},
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Më mbaj mend',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-              TextButton(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 0),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'Ke harruar fjalëkalimin?',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF3B82F6),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
           const SizedBox(height: 24),
           // Sign In Button
           SizedBox(
@@ -469,38 +424,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         letterSpacing: 0.3,
                       ),
                     ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // Footer text
-          Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Nuk ke llogari? ',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {},
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(0, 0),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text(
-                    'Regjistrohu',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF3B82F6),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
             ),
           ),
         ],

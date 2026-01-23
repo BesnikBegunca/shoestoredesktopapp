@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
@@ -225,15 +226,8 @@ class _FitimetScreenState extends State<FitimetScreen> {
         children: [
           // Header
           Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+            decoration: const BoxDecoration(
+              color: AppTheme.bgPage,
             ),
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -241,17 +235,13 @@ class _FitimetScreenState extends State<FitimetScreen> {
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(
-                        Icons.trending_up,
-                        color: Colors.green.shade700,
-                        size: 32,
+                    SvgPicture.asset(
+                      'assets/icons/fitimet.svg',
+                      width: 32,
+                      height: 32,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.black,
+                        BlendMode.srcIn,
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -457,7 +447,7 @@ class _FitimetScreenState extends State<FitimetScreen> {
                                       ),
                                       Expanded(
                                         flex: 1,
-                                        child: _tableHeader('Margjina'),
+                                        child: _tableHeader('Printo'),
                                       ),
                                     ],
                                   ),
@@ -524,23 +514,17 @@ class _FitimetScreenState extends State<FitimetScreen> {
                                           ),
                                           Expanded(
                                             flex: 1,
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                                vertical: 4,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.green.withOpacity(0.1),
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: Text(
-                                                '${margin.toStringAsFixed(1)}%',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w800,
-                                                  fontSize: 12,
-                                                  color: Colors.green.shade700,
+                                            child: Center(
+                                              child: IconButton(
+                                                onPressed: () {
+                                                  // TODO: Implement print functionality
+                                                },
+                                                icon: const Icon(
+                                                  Icons.print,
+                                                  size: 20,
                                                 ),
+                                                color: AppTheme.textPrimary,
+                                                tooltip: 'Printo',
                                               ),
                                             ),
                                           ),

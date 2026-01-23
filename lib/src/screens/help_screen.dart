@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_theme.dart';
 
 class HelpScreen extends StatefulWidget {
@@ -160,15 +161,8 @@ class _HelpScreenState extends State<HelpScreen> {
         children: [
           // Header
           Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+            decoration: const BoxDecoration(
+              color: AppTheme.bgPage,
             ),
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -176,17 +170,13 @@ class _HelpScreenState extends State<HelpScreen> {
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(
-                        Icons.help_outline,
-                        color: Colors.blue.shade700,
-                        size: 32,
+                    SvgPicture.asset(
+                      'assets/icons/info.svg',
+                      width: 32,
+                      height: 32,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.black,
+                        BlendMode.srcIn,
                       ),
                     ),
                     const SizedBox(width: 16),

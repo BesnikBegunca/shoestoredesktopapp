@@ -598,7 +598,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
               decoration: const BoxDecoration(
-                color: AppTheme.bgPage,
+                color: AppTheme.bgSurface,
               ),
               child: Row(
                 children: [
@@ -620,18 +620,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           'Stoku/Produktet',
                           style: TextStyle(
                             fontSize: 32,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w500,
                             color: Colors.black,
                             letterSpacing: -0.5,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Menaxho produktet dhe stokun',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -820,7 +811,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return Text(
       text,
       style: const TextStyle(
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w400,
         color: Colors.black87,
         fontSize: 14,
         letterSpacing: 0.2,

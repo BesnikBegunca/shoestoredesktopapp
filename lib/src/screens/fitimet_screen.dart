@@ -253,17 +253,8 @@ class _FitimetScreenState extends State<FitimetScreen> {
                             'Fitimet',
                             style: TextStyle(
                               fontSize: 28,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w500,
                               color: AppTheme.text,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Raporti i detajuar i fitimeve',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.muted,
-                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -363,7 +354,7 @@ class _FitimetScreenState extends State<FitimetScreen> {
                               'Lista e Shitjeve - ${_getPeriodLabel()}',
                               style: const TextStyle(
                                 fontSize: 20,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w400,
                                 color: AppTheme.text,
                               ),
                             ),
@@ -575,7 +566,7 @@ class _FitimetScreenState extends State<FitimetScreen> {
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w400,
                 fontSize: 15,
                 color: isSelected ? Colors.white : AppTheme.text,
               ),
@@ -628,7 +619,7 @@ class _FitimetScreenState extends State<FitimetScreen> {
             title,
             style: TextStyle(
               color: AppTheme.muted,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w400,
               fontSize: 13,
             ),
           ),

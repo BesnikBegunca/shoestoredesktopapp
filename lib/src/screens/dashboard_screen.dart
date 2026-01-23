@@ -92,10 +92,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(width: 16),
                 const Text(
-                  'Permbledhja',
+                  'Përmbledhja',
                   style: TextStyle(
                     fontSize: 28,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w500,
                     color: AppTheme.text,
                   ),
                 ),
@@ -316,7 +316,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 'Shitjet e Javës së Fundit',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w400,
                   color: AppTheme.text,
                 ),
               ),
@@ -474,7 +474,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Përmbledhje Financiare',
             style: TextStyle(
               fontSize: 18,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w400,
               color: AppTheme.text,
             ),
           ),
@@ -548,7 +548,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Quick Stats',
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w400,
               color: AppTheme.text,
             ),
           ),
@@ -596,7 +596,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             label,
             style: TextStyle(
               color: AppTheme.muted,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w400,
               fontSize: 13,
             ),
           ),
@@ -628,7 +628,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             'Shitje të Fundit',
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w400,
               color: AppTheme.text,
             ),
           ),

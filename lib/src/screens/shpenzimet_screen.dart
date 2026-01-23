@@ -316,17 +316,8 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                             'Shpenzimet',
                             style: TextStyle(
                               fontSize: 28,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w500,
                               color: AppTheme.text,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Menaxhimi i shpenzimeve dhe investimeve',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.muted,
-                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],

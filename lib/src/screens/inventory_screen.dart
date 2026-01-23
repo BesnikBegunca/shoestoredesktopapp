@@ -542,7 +542,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             title,
             style: const TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w400,
               color: Colors.black87,
             ),
           ),
@@ -695,21 +695,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Inventory',
+                          'Regjistrimi i Mallit',
                           style: TextStyle(
                             fontSize: 32,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w500,
                             color: Colors.black,
                             letterSpacing: -0.5,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Shto ose modifiko produkt',
-                          style: TextStyle(
-                            color: Colors.black87,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],

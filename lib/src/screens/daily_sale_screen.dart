@@ -876,7 +876,7 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                       'Shitja Ditore',
                       style: TextStyle(
                         fontSize: 28,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w500,
                         color: Colors.black,
                         letterSpacing: -0.5,
                       ),
@@ -1033,7 +1033,7 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                             style: TextStyle(
                               fontSize: 24,
                               color: Colors.black,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w500,
                               letterSpacing: -0.5,
                             ),
                           ),
@@ -1043,7 +1043,7 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.black.withOpacity(0.6),
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
                         ],
@@ -1338,16 +1338,16 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                 'Totali:',
                 style: TextStyle(
                   color: Colors.black87,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(width: 12),
               Text(
                 '€${total.toStringAsFixed(2)}',
                 style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500,
                   color: Colors.black87,
                   letterSpacing: -0.5,
                 ),

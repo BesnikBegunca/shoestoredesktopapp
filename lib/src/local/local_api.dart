@@ -590,8 +590,7 @@ class LocalApi {
 
   Future<void> init() async {
     if (_ready) return;
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    DatabaseManager.ensureSqfliteInitialized();
     
     // Initialize DatabaseManager (opens admin DB)
     await DatabaseManager.getAdminDb();

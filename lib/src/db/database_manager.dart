@@ -17,13 +17,20 @@ class DatabaseManager {
   static const int kAdminDbVersion = 1;
   static const int kBusinessDbVersion = 11; // same as current version
   
-  /// Inicializo sqflite një herë në fillim
+  /// Inicializo sqflite FFI në mënyrë të sigurt (vetëm një herë)
+  /// Ky funksion mund të përdoret nga çdo vend në aplikacion
+  /// për të siguruar që sqflite është inicializuar pa shkaktuar paralajmërime
+  static void ensureSqfliteInitialized() {
+    if (_isInitialized) return;
+    
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    _isInitialized = true;
+  }
+  
+  /// Inicializo sqflite një herë në fillim (përdoret internalisht)
   static void _ensureInitialized() {
-    if (!_isInitialized) {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-      _isInitialized = true;
-    }
+    ensureSqfliteInitialized();
   }
   
   /// Merr databazën admin (qendrore)
@@ -142,7 +149,8 @@ class DatabaseManager {
     }
     _businessDbs.clear();
     _currentBusinessId = null;
-    _isInitialized = false;
+    // Mos e resetoni _isInitialized - sqflite FFI duhet të inicializohet vetëm një herë
+    // _isInitialized = false;
   }
   
   // ================= SCHEMA CREATION =================

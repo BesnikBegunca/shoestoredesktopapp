@@ -26,8 +26,7 @@ class MigrationHelper {
 
   /// Migro nga databaza e vjetër tek e reja
   static Future<void> migrateToMultiTenant() async {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    DatabaseManager.ensureSqfliteInitialized();
 
     final dir = await getApplicationSupportDirectory();
     final oldPath = p.join(dir.path, 'shoe_store.sqlite');

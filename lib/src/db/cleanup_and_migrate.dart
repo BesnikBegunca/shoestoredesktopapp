@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'database_manager.dart';
 import '../license/license_service.dart';
 
@@ -11,8 +10,7 @@ class CleanupAndMigrate {
 
   /// Fshi të gjitha databazat dhe fillo nga e para
   static Future<void> cleanAllAndRestart() async {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    DatabaseManager.ensureSqfliteInitialized();
 
     final dir = await getApplicationSupportDirectory();
     
@@ -50,8 +48,7 @@ class CleanupAndMigrate {
 
   /// Fshi vetëm bizneset dhe databazat e tyre (mbaj superadmin)
   static Future<void> deleteAllBusinesses() async {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    DatabaseManager.ensureSqfliteInitialized();
 
     final dir = await getApplicationSupportDirectory();
     final adminDb = await DatabaseManager.getAdminDb();
@@ -92,8 +89,7 @@ class CleanupAndMigrate {
     String email = 'test@test.com',
     String phone = '044123456',
   }) async {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    DatabaseManager.ensureSqfliteInitialized();
 
     final adminDb = await DatabaseManager.getAdminDb();
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -169,8 +165,7 @@ class CleanupAndMigrate {
 
   /// Shfaq informacion mbi databazat aktuale
   static Future<void> printSystemInfo() async {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    DatabaseManager.ensureSqfliteInitialized();
 
     final dir = await getApplicationSupportDirectory();
     

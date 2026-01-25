@@ -453,7 +453,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       final editing = widget.editing;
 
       if (editing == null) {
-        await LocalApi.I.addProduct(
+        final productId = await LocalApi.I.addProduct(
           name: name,
           sku: null, // SKU gjenerohet automatikisht për variantet
           serialNumber: serial,
@@ -467,6 +467,26 @@ class _InventoryScreenState extends State<InventoryScreen> {
           subcategory: subcategory,
           autoGenerateVariants: true,
         );
+        
+        // ✅ Krijo automatikisht shpenzim "Blerje Malli" nëse Çmimi i Blerjes > 0
+        if (purchase != null && purchase > 0 && total > 0) {
+          try {
+            // Llogarit shumën totale: Çmimi i Blerjes * TotalStock (për 1 copë)
+            final expenseAmount = purchase * total;
+            final expenseNote = 'Blerje Malli - $name${serial != null ? ' (Barcode: $serial)' : ''}';
+            
+            await LocalApi.I.addExpense(
+              userId: null,
+              category: 'Blerje Malli',
+              amount: expenseAmount,
+              note: expenseNote,
+            );
+          } catch (e) {
+            // Mos prish ruajtjen e produktit nëse ka gabim në shpenzim
+            _snack('Produkti u shtua, por shpenzimi nuk u krijua: $e');
+          }
+        }
+        
         _snack('Produkti u shtua me sukses ✅');
         // Reset form
         nameC.clear();
@@ -744,6 +764,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               _buildTextField(
                                 controller: priceC,
                                 label: 'Çmimi Bazë',
+                                isNumber: true,
+                              ),
+                              _buildTextField(
+                                controller: purchaseC,
+                                label: 'Çmimi i Blerjes',
                                 isNumber: true,
                               ),
                               _buildTextField(

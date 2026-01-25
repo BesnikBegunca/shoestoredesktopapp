@@ -13,6 +13,7 @@ class FullscreenService {
       title: 'Shoe Store Manager',
       center: true,
       skipTaskbar: false,
+      fullScreen: true,
     );
 
     windowManager.waitUntilReadyToShow(windowOptions, () async {

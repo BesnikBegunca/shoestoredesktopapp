@@ -873,31 +873,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         ),
                                       )
                                     : Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.add_photo_alternate,
-                                              size: 48,
-                                              color: Colors.grey.shade400,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            TextButton.icon(
-                                              onPressed: _pickImage,
-                                              icon: const Icon(Icons.add),
-                                              label: const Text('Shto Foto Tjetër'),
-                                            ),
-                                          ],
+                                        child: Icon(
+                                          Icons.add_photo_alternate,
+                                          size: 48,
+                                          color: Colors.grey.shade400,
                                         ),
                                       ),
                               ),
                               const SizedBox(height: 12),
                               Material(
-                                color: Colors.black87,
+                                color: Colors.grey.shade400,
                                 borderRadius: BorderRadius.circular(8),
                                 child: InkWell(
-                                  onTap: _pickImage,
+                                  onTap: null,
                                   borderRadius: BorderRadius.circular(8),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(

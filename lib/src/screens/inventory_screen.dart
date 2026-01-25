@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../db/database_manager.dart';
 import '../local/local_api.dart';
 import '../theme/app_theme.dart';
 
@@ -66,19 +67,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     '6Y',
   ];
 
-  final List<String> categories = [
-    'Bebe',
-    'Vajza',
-    'Djem',
-    'Patika',
-    'Rroba Stinore',
-    'Rroba Sportive',
-    'Rroba Gjumi',
-    'Aksesorë',
-  ];
+  List<String> get categories => categoryTags.keys.toList();
 
   // Map category to its tags
-  final Map<String, List<String>> categoryTags = {
+  // Default categories
+  static const Map<String, List<String>> _defaultCategoryTags = {
     'Bebe': [
       'Bodysuit / Onesies',
       'Sete bebe',
@@ -114,6 +107,48 @@ class _InventoryScreenState extends State<InventoryScreen> {
     'Aksesorë': ['Kapele', 'Çorape', 'Shami'],
   };
 
+  Map<String, List<String>> categoryTags = {};
+  Map<String, List<String>> categorySizes = {}; // categoryName -> [sizes]
+  bool _categoriesLoaded = false;
+
+  // Load categories from DB or use default
+  Future<void> _loadCategories() async {
+    if (_categoriesLoaded) return;
+    
+    try {
+      final businessId = await DatabaseManager.getCurrentBusinessId();
+      if (businessId != null) {
+        final customCategories = await LocalApi.I.getBusinessCategories(businessId);
+        if (customCategories.isNotEmpty) {
+          // Load sizes për çdo kategori
+          final sizesMap = <String, List<String>>{};
+          for (final catName in customCategories.keys) {
+            final sizes = await LocalApi.I.getBusinessCategorySizes(businessId, catName);
+            if (sizes.isNotEmpty) {
+              sizesMap[catName] = sizes;
+            }
+          }
+          
+          setState(() {
+            categoryTags = customCategories;
+            categorySizes = sizesMap;
+            _categoriesLoaded = true;
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      // Nëse ka gabim, përdor default
+    }
+    
+    // Përdor kategoritë default
+    setState(() {
+      categoryTags = Map<String, List<String>>.from(_defaultCategoryTags);
+      categorySizes = {}; // Default sizes do të përdoren nga minSize/maxSize dhe clothSizes
+      _categoriesLoaded = true;
+    });
+  }
+
   // Get tags for selected category
   List<String> getTagsForCategory(String? category) {
     if (category == null || category.isEmpty) {
@@ -124,9 +159,39 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   int _clothKey(int index) => 1000 + index;
 
+  // ✅ Përditëso sizes kur kategoria ndryshon
+  Future<void> _updateSizesForCategory(String? categoryName) async {
+    if (categoryName == null || categoryName.isEmpty) {
+      // Përdor default
+      return;
+    }
+
+    try {
+      final businessId = await DatabaseManager.getCurrentBusinessId();
+      if (businessId != null && categorySizes.containsKey(categoryName)) {
+        final customSizes = categorySizes[categoryName]!;
+        
+        // Ndrysho llojin bazuar në sizes
+        final hasNumeric = customSizes.any((s) => int.tryParse(s) != null);
+        final hasText = customSizes.any((s) => int.tryParse(s) == null);
+        
+        if (hasText && !hasNumeric) {
+          kind = ProductKind.clothes;
+        } else if (hasNumeric && !hasText) {
+          kind = ProductKind.shoes;
+        }
+        
+        setState(() {});
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _loadCategories(); // Load categories from DB or use default
     final p0 = widget.editing;
 
     nameC = TextEditingController(text: p0?.name ?? '');
@@ -157,6 +222,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
     kind = hasClothLike ? ProductKind.clothes : ProductKind.shoes;
 
+    // ✅ Krijo controllers me default sizes (do të përditësohen kur kategoria zgjedhet)
     sizeCtrls = {
       for (int s = minSize; s <= maxSize; s++)
         s: TextEditingController(text: (existing[s] ?? 0).toString()),
@@ -439,7 +505,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       final editing = widget.editing;
 
       if (editing == null) {
-        await LocalApi.I.addProduct(
+        final productId = await LocalApi.I.addProduct(
           name: name,
           sku: null, // SKU gjenerohet automatikisht për variantet
           serialNumber: serial,
@@ -453,6 +519,26 @@ class _InventoryScreenState extends State<InventoryScreen> {
           subcategory: subcategory,
           autoGenerateVariants: true,
         );
+        
+        // ✅ Krijo automatikisht shpenzim "Blerje Malli" nëse Çmimi i Blerjes > 0
+        if (purchase != null && purchase > 0 && total > 0) {
+          try {
+            // Llogarit shumën totale: Çmimi i Blerjes * TotalStock (për 1 copë)
+            final expenseAmount = purchase * total;
+            final expenseNote = 'Blerje Malli - $name${serial != null ? ' (Barcode: $serial)' : ''}';
+            
+            await LocalApi.I.addExpense(
+              userId: null,
+              category: 'Blerje Malli',
+              amount: expenseAmount,
+              note: expenseNote,
+            );
+          } catch (e) {
+            // Mos prish ruajtjen e produktit nëse ka gabim në shpenzim
+            _snack('Produkti u shtua, por shpenzimi nuk u krijua: $e');
+          }
+        }
+        
         _snack('Produkti u shtua me sukses ✅');
         // Reset form
         nameC.clear();
@@ -623,6 +709,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
             // If category changed, clear and update tags
             if (isCategory) {
               tagsC.clear();
+              // ✅ Reload sizes për kategorinë e re
+              _updateSizesForCategory(value);
             }
             setState(() {});
           }
@@ -715,6 +803,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               _buildTextField(
                                 controller: priceC,
                                 label: 'Çmimi Bazë',
+                                isNumber: true,
+                              ),
+                              _buildTextField(
+                                controller: purchaseC,
+                                label: 'Çmimi i Blerjes',
                                 isNumber: true,
                               ),
                               _buildTextField(
@@ -853,33 +946,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         ),
                                       )
                                     : Center(
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.add_photo_alternate,
-                                              size: 48,
-                                              color: Colors.grey.shade400,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            TextButton.icon(
-                                              onPressed: _pickImage,
-                                              icon: const Icon(Icons.add),
-                                              label: const Text(
-                                                'Shto Foto Tjetër',
-                                              ),
-                                            ),
-                                          ],
+                                        child: Icon(
+                                          Icons.add_photo_alternate,
+                                          size: 48,
+                                          color: Colors.grey.shade400,
                                         ),
                                       ),
                               ),
                               const SizedBox(height: 12),
                               Material(
-                                color: Colors.black87,
+                                color: Colors.grey.shade400,
                                 borderRadius: BorderRadius.circular(8),
                                 child: InkWell(
-                                  onTap: _pickImage,
+                                  onTap: null,
                                   borderRadius: BorderRadius.circular(8),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
@@ -915,13 +994,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           _buildPanel(
                             title: 'Kategoria',
                             children: [
-                              _buildDropdown(
-                                controller: categoryC,
-                                label: 'Kategoria e Produktit',
-                                items: categories,
-                                hint: 'Zgjedh kategori',
-                                isCategory: true,
-                              ),
+                              _categoriesLoaded
+                                  ? _buildDropdown(
+                                      controller: categoryC,
+                                      label: 'Kategoria e Produktit',
+                                      items: categories,
+                                      hint: 'Zgjedh kategori',
+                                      isCategory: true,
+                                    )
+                                  : const Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(16.0),
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    ),
                               // Tags dropdown - reactive to category changes
                               ValueListenableBuilder<TextEditingValue>(
                                 valueListenable: categoryC,
@@ -983,7 +1069,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       ),
                                     ),
                                     child: Text(
-                                      'Totali: $totalStock',
+                                      'Totali: ${_totalStock(_collectSizeStock())}',
                                       style: const TextStyle(
                                         color: Colors.black87,
                                         fontWeight: FontWeight.w900,
@@ -995,15 +1081,54 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               ),
                               const SizedBox(height: 12),
                               // Auto-show grid based on category/tag selection
-                              SizedBox(
-                                height:
-                                    300, // 🔒 lartësi fikse për TË DYJA rastet
-                                child: Align(
-                                  alignment: Alignment.topCenter,
-                                  child: kind == ProductKind.shoes
+                              // ✅ Reaktive me kategorinë e zgjedhur për sizes custom
+                              ValueListenableBuilder<TextEditingValue>(
+                                valueListenable: categoryC,
+                                builder: (context, categoryValue, child) {
+                                  final selectedCat = categoryValue.text.trim();
+                                  
+                                  // ✅ Nëse ka sizes custom për kategorinë, përditëso controllers
+                                  if (selectedCat.isNotEmpty && categorySizes.containsKey(selectedCat)) {
+                                    final customSizes = categorySizes[selectedCat]!;
+                                    final numericSizes = customSizes
+                                        .map((s) => int.tryParse(s))
+                                        .whereType<int>()
+                                        .toList()
+                                      ..sort();
+                                    final textSizes = customSizes
+                                        .where((s) => int.tryParse(s) == null)
+                                        .toList();
+                                    
+                                    // Krijo/update controllers për numeric sizes
+                                    for (final size in numericSizes) {
+                                      if (!sizeCtrls.containsKey(size)) {
+                                        sizeCtrls[size] = TextEditingController(text: '0');
+                                      }
+                                    }
+                                    
+                                    // Krijo/update controllers për text sizes
+                                    for (int i = 0; i < textSizes.length; i++) {
+                                      final label = textSizes[i];
+                                      if (!clothCtrls.containsKey(label)) {
+                                        clothCtrls[label] = TextEditingController(text: '0');
+                                      }
+                                    }
+                                    
+                                    // Përcakto llojin
+                                    if (textSizes.isNotEmpty && numericSizes.isEmpty) {
+                                      kind = ProductKind.clothes;
+                                    } else if (numericSizes.isNotEmpty && textSizes.isEmpty) {
+                                      kind = ProductKind.shoes;
+                                    }
+                                  }
+                                  
+                                  return kind == ProductKind.shoes
                                       ? _sizesGrid()
-                                      : _clothSizesGrid(),
-                                ),
+                                      : SizedBox(
+                                          height: 300,
+                                          child: _clothSizesGrid(),
+                                        );
+                                },
                               ),
                             ],
                           ),
@@ -1090,7 +1215,27 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _sizesGrid() {
-    final keys = sizeCtrls.keys.toList()..sort();
+    // ✅ Nëse ka sizes custom për kategorinë e zgjedhur, përdor ato
+    final selectedCategory = categoryC.text.trim();
+    List<int> sizesToShow = sizeCtrls.keys.toList()..sort();
+    
+    if (selectedCategory.isNotEmpty && categorySizes.containsKey(selectedCategory)) {
+      final customSizes = categorySizes[selectedCategory]!;
+      sizesToShow = customSizes
+          .map((s) => int.tryParse(s))
+          .whereType<int>()
+          .toList()
+        ..sort();
+      
+      // Krijo controllers për sizes që mungojnë
+      for (final size in sizesToShow) {
+        if (!sizeCtrls.containsKey(size)) {
+          sizeCtrls[size] = TextEditingController(text: '0');
+        }
+      }
+    }
+    
+    final keys = sizesToShow;
 
     return LayoutBuilder(
       builder: (context, c) {
@@ -1216,12 +1361,31 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _clothSizesGrid() {
+    // ✅ Nëse ka sizes custom për kategorinë e zgjedhur, përdor ato
+    final selectedCategory = categoryC.text.trim();
+    List<String> sizesToShow = List<String>.from(clothSizes);
+    
+    if (selectedCategory.isNotEmpty && categorySizes.containsKey(selectedCategory)) {
+      final customSizes = categorySizes[selectedCategory]!;
+      sizesToShow = customSizes
+          .where((s) => int.tryParse(s) == null) // Vetëm text sizes (jo numeric)
+          .toList();
+      
+      // Krijo controllers për sizes që mungojnë
+      for (int i = 0; i < sizesToShow.length; i++) {
+        final label = sizesToShow[i];
+        if (!clothCtrls.containsKey(label)) {
+          clothCtrls[label] = TextEditingController(text: '0');
+        }
+      }
+    }
+    
     return LayoutBuilder(
       builder: (context, c) {
         final cols = c.maxWidth >= 800 ? 4 : (c.maxWidth >= 600 ? 3 : 2);
         final tiles = <Widget>[];
 
-        for (final label in clothSizes) {
+        for (final label in sizesToShow) {
           final ctrl = clothCtrls[label]!;
           final q = _parseInt(ctrl.text);
 

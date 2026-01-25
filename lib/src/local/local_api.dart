@@ -588,9 +588,8 @@ class LocalApi {
 
   Future<void> init() async {
     if (_ready) return;
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-
+    DatabaseManager.ensureSqfliteInitialized();
+    
     // Initialize DatabaseManager (opens admin DB)
     await DatabaseManager.getAdminDb();
 
@@ -864,6 +863,9 @@ class LocalApi {
     String? notes,
     required int createdByUserId,
     int validDays = 365, // Default 365 ditë
+    bool useDefaultCategories = true, // Përdor kategoritë default
+    Map<String, List<String>>? customCategories, // Kategoritë e reja (category -> [subcategories])
+    Map<String, List<String>>? customCategorySizes, // Numrat/madhësitë për kategori (categoryName -> [sizes])
   }) async {
     final adminDb = await DatabaseManager.getAdminDb();
     final n = name.trim();
@@ -929,6 +931,16 @@ class LocalApi {
         'active': 1,
         'notes': 'Auto-krijuar gjatë regjistrimit të biznesit',
       });
+
+      // 5. ✅ Krijo kategoritë për biznesin
+      if (!useDefaultCategories && customCategories != null && customCategories.isNotEmpty) {
+        await _saveBusinessCategories(
+          businessDb,
+          customCategories,
+          now,
+          categorySizes: customCategorySizes,
+        );
+      }
 
       return businessId;
     } catch (e) {
@@ -1126,6 +1138,196 @@ class LocalApi {
       where: 'id = ?',
       whereArgs: [licenseId],
     );
+  }
+
+  /// Vazhdo (extend) licencën ekzistuese ose shto një të re
+  /// Nëse ka licencë aktive, e vazhdon atë. Nëse nuk ka, shton një të re.
+  Future<void> extendOrAddBusinessLicense({
+    required int businessId,
+    required int validDays,
+    String? notes,
+  }) async {
+    final adminDb = await DatabaseManager.getAdminDb();
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    // Gjej licencën aktive ekzistuese
+    final existingLicenses = await adminDb.query(
+      'business_licenses',
+      where: 'businessId = ? AND active = 1',
+      whereArgs: [businessId],
+      orderBy: 'expiresAtMs DESC',
+      limit: 1,
+    );
+
+    if (existingLicenses.isNotEmpty) {
+      // ✅ Ka licencë aktive - vazhdojeni
+      final existing = existingLicenses.first;
+      final currentExpiresAt = existing['expiresAtMs'] as int;
+      final newExpiresAt = currentExpiresAt + (validDays * 24 * 60 * 60 * 1000);
+      final currentValidDays = existing['validDays'] as int;
+      final newValidDays = currentValidDays + validDays;
+
+      await adminDb.update(
+        'business_licenses',
+        {
+          'validDays': newValidDays,
+          'expiresAtMs': newExpiresAt,
+          'lastCheckedMs': now,
+          'notes': notes ?? existing['notes'],
+        },
+        where: 'id = ?',
+        whereArgs: [existing['id']],
+      );
+    } else {
+      // ✅ Nuk ka licencë aktive - shto një të re
+      final licenseKey = await LicenseService.I.generateLicenseKey(
+        'business-$businessId',
+        validDays: validDays,
+      );
+      
+      final expiresAtMs = now + (validDays * 24 * 60 * 60 * 1000);
+      
+      await adminDb.insert('business_licenses', {
+        'businessId': businessId,
+        'licenseKey': licenseKey,
+        'validDays': validDays,
+        'issuedAtMs': now,
+        'expiresAtMs': expiresAtMs,
+        'activatedAtMs': now,
+        'lastCheckedMs': now,
+        'active': 1,
+        'notes': notes,
+      });
+    }
+  }
+
+  // ================= BUSINESS CATEGORIES =================
+
+  /// Ruaj kategoritë e reja për një biznes
+  Future<void> _saveBusinessCategories(
+    Database businessDb,
+    Map<String, List<String>> categories,
+    int createdAtMs, {
+    Map<String, List<String>>? categorySizes, // categoryName -> [sizes]
+  }) async {
+    for (final entry in categories.entries) {
+      final categoryName = entry.key.trim();
+      final subcategories = entry.value;
+
+      if (categoryName.isEmpty) continue;
+
+      // Shto kategorinë
+      final categoryId = await businessDb.insert('business_categories', {
+        'name': categoryName,
+        'createdAtMs': createdAtMs,
+      });
+
+      // Shto nën-kategoritë
+      for (final subName in subcategories) {
+        final subNameTrimmed = subName.trim();
+        if (subNameTrimmed.isEmpty) continue;
+
+        try {
+          await businessDb.insert('business_subcategories', {
+            'categoryId': categoryId,
+            'name': subNameTrimmed,
+            'createdAtMs': createdAtMs,
+          });
+        } catch (e) {
+          // Ignore duplicate subcategories
+        }
+      }
+
+      // ✅ Shto numrat/madhësitë për kategorinë
+      if (categorySizes != null && categorySizes.containsKey(categoryName)) {
+        final sizes = categorySizes[categoryName]!;
+        for (int i = 0; i < sizes.length; i++) {
+          final sizeValue = sizes[i].trim();
+          if (sizeValue.isEmpty) continue;
+
+          // Përcakto llojin: nëse është numër, 'numeric', përndryshe 'text'
+          final isNumeric = int.tryParse(sizeValue) != null;
+          final sizeType = isNumeric ? 'numeric' : 'text';
+
+          try {
+            await businessDb.insert('business_category_sizes', {
+              'categoryId': categoryId,
+              'sizeType': sizeType,
+              'sizeValue': sizeValue,
+              'displayOrder': i,
+              'createdAtMs': createdAtMs,
+            });
+          } catch (e) {
+            // Ignore duplicates
+          }
+        }
+      }
+    }
+  }
+
+  /// Merr kategoritë e një biznesi nga DB
+  Future<Map<String, List<String>>> getBusinessCategories(int businessId) async {
+    final businessDb = await DatabaseManager.getBusinessDb(businessId);
+    
+    final categories = await businessDb.query(
+      'business_categories',
+      orderBy: 'name ASC',
+    );
+    
+    if (categories.isEmpty) {
+      return {}; // Nuk ka kategoritë custom, përdor default
+    }
+
+    final result = <String, List<String>>{};
+    
+    for (final cat in categories) {
+      final categoryId = cat['id'] as int;
+      final categoryName = cat['name'] as String;
+      
+      final subcategories = await businessDb.query(
+        'business_subcategories',
+        where: 'categoryId = ?',
+        whereArgs: [categoryId],
+        orderBy: 'name ASC',
+      );
+      
+      result[categoryName] = subcategories
+          .map((s) => s['name'] as String)
+          .toList();
+    }
+    
+    return result;
+  }
+
+  /// Merr numrat/madhësitë e një kategorie nga DB
+  Future<List<String>> getBusinessCategorySizes(int businessId, String categoryName) async {
+    final businessDb = await DatabaseManager.getBusinessDb(businessId);
+    
+    // Gjej categoryId
+    final categoryRows = await businessDb.query(
+      'business_categories',
+      where: 'name = ?',
+      whereArgs: [categoryName],
+      limit: 1,
+    );
+    
+    if (categoryRows.isEmpty) {
+      return []; // Kategoria nuk ekziston
+    }
+    
+    final categoryId = categoryRows.first['id'] as int;
+    
+    // Merr numrat/madhësitë
+    final sizeRows = await businessDb.query(
+      'business_category_sizes',
+      where: 'categoryId = ?',
+      whereArgs: [categoryId],
+      orderBy: 'displayOrder ASC',
+    );
+    
+    return sizeRows
+        .map((s) => s['sizeValue'] as String)
+        .toList();
   }
 
   // ================= PRODUCTS =================

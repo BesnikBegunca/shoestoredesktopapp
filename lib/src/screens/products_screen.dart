@@ -113,6 +113,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
+  Future<void> _openStockDialog(Product product) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _StockBySizeDialog(product: product),
+    );
+    if (result == true) {
+      await _load();
+    }
+  }
+
   Future<void> _deleteProduct(Product product) async {
     // Konfirmimi
     final confirm = await showDialog<bool>(
@@ -676,7 +687,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           flex: 1,
                           child: _tableHeader('Sasia'),
                         ),
-                        const SizedBox(width: 60), // Space for delete button
+                        const SizedBox(width: 100), // Space for Shto and delete buttons
                       ],
                     ),
                   ),
@@ -877,6 +888,44 @@ class _ProductsScreenState extends State<ProductsScreen> {
               ),
             ),
           ),
+          // Shto Button
+          if (!widget.readonly)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Material(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  onTap: () => _openStockDialog(p0),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.add,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Shto',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           // Delete Button
           SizedBox(
             width: 60,
@@ -911,6 +960,627 @@ class _ProductsScreenState extends State<ProductsScreen> {
           color: c,
           fontWeight: FontWeight.w800,
           fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+// ============================
+// ✅ DIALOG: STOCK BY SIZE
+// ============================
+
+class _StockBySizeDialog extends StatefulWidget {
+  final Product product;
+  const _StockBySizeDialog({required this.product});
+
+  @override
+  State<_StockBySizeDialog> createState() => _StockBySizeDialogState();
+}
+
+class _StockBySizeDialogState extends State<_StockBySizeDialog> {
+  // shoes
+  late Map<int, TextEditingController> sizeCtrls;
+
+  // clothes
+  late Map<String, TextEditingController> clothCtrls;
+
+  ProductKind kind = ProductKind.shoes;
+  bool saving = false;
+
+  static const int minSize = 17;
+  static const int maxSize = 30;
+
+  static const List<String> clothSizes = [
+    '0-3M',
+    '3-6M',
+    '6-9M',
+    '9-12M',
+    '12-18M',
+    '18-24M',
+    '2Y',
+    '3Y',
+    '4Y',
+    '5Y',
+    '6Y',
+  ];
+
+  int _clothKey(int index) => 1000 + index;
+
+  @override
+  void initState() {
+    super.initState();
+    final p0 = widget.product;
+    final existing = p0.sizeStock;
+
+    // ✅ nese ka keys 1000+ ose jashtë 17–30, e trajtojmë si TESHA
+    final hasClothLike = existing.keys.any(
+      (k) => k >= 1000 || k < minSize || k > maxSize,
+    );
+    kind = hasClothLike ? ProductKind.clothes : ProductKind.shoes;
+
+    sizeCtrls = {
+      for (int s = minSize; s <= maxSize; s++)
+        s: TextEditingController(text: (existing[s] ?? 0).toString()),
+    };
+
+    clothCtrls = {
+      for (int i = 0; i < clothSizes.length; i++)
+        clothSizes[i]: TextEditingController(
+          text: (existing[_clothKey(i)] ?? 0).toString(),
+        ),
+    };
+  }
+
+  @override
+  void dispose() {
+    for (final c in sizeCtrls.values) {
+      c.dispose();
+    }
+    for (final c in clothCtrls.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  int _parseInt(String s) => int.tryParse(s.trim()) ?? 0;
+
+  Map<int, int> _collectSizeStock() {
+    final out = <int, int>{};
+
+    if (kind == ProductKind.shoes) {
+      for (final entry in sizeCtrls.entries) {
+        final size = entry.key;
+        final ctrl = entry.value;
+        final q = _parseInt(ctrl.text);
+        if (q < 0) continue;
+        out[size] = q > 0 ? q : 0;
+      }
+    } else {
+      for (int i = 0; i < clothSizes.length; i++) {
+        final label = clothSizes[i];
+        final ctrl = clothCtrls[label]!;
+        final q = _parseInt(ctrl.text);
+        if (q < 0) continue;
+        out[_clothKey(i)] = q > 0 ? q : 0;
+      }
+    }
+
+    return out;
+  }
+
+  int _totalStock(Map<int, int> m) => m.values.fold(0, (a, b) => a + b);
+
+  Future<void> _save() async {
+    if (saving) return;
+
+    final sizeStock = _collectSizeStock();
+
+    // Validate negatives
+    if (kind == ProductKind.shoes) {
+      for (final e in sizeCtrls.entries) {
+        final q = _parseInt(e.value.text);
+        if (q < 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Numri ${e.key}: sasia s\'mund me qenë negative.')),
+          );
+          return;
+        }
+      }
+    } else {
+      for (final label in clothSizes) {
+        final q = _parseInt(clothCtrls[label]!.text);
+        if (q < 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Masa $label: sasia s\'mund me qenë negative.')),
+          );
+          return;
+        }
+      }
+    }
+
+    setState(() => saving = true);
+    try {
+      final p0 = widget.product;
+      await LocalApi.I.updateProduct(
+        id: p0.id,
+        name: p0.name,
+        sku: p0.sku,
+        serialNumber: p0.serialNumber,
+        price: p0.price,
+        purchasePrice: p0.purchasePrice,
+        discountPercent: p0.discountPercent,
+        active: p0.active,
+        imagePath: p0.imagePath,
+        sizeStock: sizeStock,
+        category: p0.category,
+        subcategory: p0.subcategory,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gabim: $e')),
+      );
+    }
+  }
+
+  Widget _kindBtn({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: selected ? Colors.black87 : Colors.black87.withOpacity(0.05),
+            border: Border.all(
+              color: selected ? Colors.black87 : Colors.black87.withOpacity(0.2),
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.w900,
+              fontSize: 15,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sizesGrid() {
+    final keys = sizeCtrls.keys.toList()..sort();
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        final cols = c.maxWidth >= 800 ? 6 : (c.maxWidth >= 600 ? 5 : 4);
+        final rows = <Widget>[];
+
+        for (final size in keys) {
+          final ctrl = sizeCtrls[size]!;
+          final q = _parseInt(ctrl.text);
+
+          rows.add(
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Size number - simple
+                Text(
+                  '$size',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 0),
+                // Quantity controls - simple: - value +
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Minus button - simple
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          final current = _parseInt(ctrl.text);
+                          if (current > 0) {
+                            ctrl.text = (current - 1).toString();
+                            setState(() {});
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(4),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.grey.shade400,
+                              width: 1,
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.remove,
+                            size: 16,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    // Value - simple
+                    SizedBox(
+                      width: 40,
+                      child: TextField(
+                        controller: ctrl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    // Plus button - simple
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          final current = _parseInt(ctrl.text);
+                          ctrl.text = (current + 1).toString();
+                          setState(() {});
+                        },
+                        borderRadius: BorderRadius.circular(4),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.grey.shade400,
+                              width: 1,
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            size: 16,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }
+
+        return GridView.count(
+          crossAxisCount: cols,
+          crossAxisSpacing: 6,
+          mainAxisSpacing: 0,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 2.5,
+          children: rows,
+        );
+      },
+    );
+  }
+
+  Widget _clothSizesGrid() {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final cols = c.maxWidth >= 800 ? 4 : (c.maxWidth >= 600 ? 3 : 2);
+        final tiles = <Widget>[];
+
+        for (final label in clothSizes) {
+          final ctrl = clothCtrls[label]!;
+          final q = _parseInt(ctrl.text);
+
+          tiles.add(
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Size label - simple
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 0),
+                // Quantity controls - simple: - value +
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Minus button - simple
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          final current = _parseInt(ctrl.text);
+                          if (current > 0) {
+                            ctrl.text = (current - 1).toString();
+                            setState(() {});
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(4),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.grey.shade400,
+                              width: 1,
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.remove,
+                            size: 16,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    // Value - simple
+                    SizedBox(
+                      width: 40,
+                      child: TextField(
+                        controller: ctrl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    // Plus button - simple
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          final current = _parseInt(ctrl.text);
+                          ctrl.text = (current + 1).toString();
+                          setState(() {});
+                        },
+                        borderRadius: BorderRadius.circular(4),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.grey.shade400,
+                              width: 1,
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.add,
+                            size: 16,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }
+
+        return GridView.count(
+          crossAxisCount: cols,
+          crossAxisSpacing: 6,
+          mainAxisSpacing: 0,
+          shrinkWrap: true,
+          physics: const AlwaysScrollableScrollPhysics(),
+          childAspectRatio: 2.5,
+          children: tiles,
+        );
+      },
+    );
+  }
+
+  Widget _totalPill(String t) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black87.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.black87.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        t,
+        style: const TextStyle(
+          color: Colors.black87,
+          fontWeight: FontWeight.w900,
+          fontSize: 13,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sizeStockPreview = _collectSizeStock();
+    final totalStock = _totalStock(sizeStockPreview);
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Stoku sipas masave - ${widget.product.name}',
+              style: const TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.w900,
+                fontSize: 24,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 600),
+              child: SizedBox(
+                width: 680,
+                child: SingleChildScrollView(
+                  child: Column(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Text(
+                                'Stoku sipas masave',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.black87,
+                                  fontSize: 17,
+                                ),
+                              ),
+                              const Spacer(),
+                              _totalPill('Total: $totalStock'),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              _kindBtn(
+                                label: 'PATIKA',
+                                selected: kind == ProductKind.shoes,
+                                onTap: () => setState(() => kind = ProductKind.shoes),
+                              ),
+                              _kindBtn(
+                                label: 'TESHA',
+                                selected: kind == ProductKind.clothes,
+                                onTap: () => setState(() => kind = ProductKind.clothes),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (kind == ProductKind.shoes)
+                      _sizesGrid()
+                    else
+                      SizedBox(
+                        height: 300,
+                        child: _clothSizesGrid(),
+                      ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: saving ? null : () => Navigator.pop(context, false),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                          ),
+                          child: const Text(
+                            'Anulo',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Material(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(10),
+                          child: InkWell(
+                            onTap: saving ? null : _save,
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 14,
+                              ),
+                              child: Text(
+                                saving ? 'Duke ruajt...' : 'Ruaj',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

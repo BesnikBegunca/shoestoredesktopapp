@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'schema.dart';
+import 'database_manager.dart';
 
 class AppDb {
   AppDb._();
@@ -23,8 +24,7 @@ class AppDb {
     final existing = _db;
     if (existing != null) return existing;
 
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    DatabaseManager.ensureSqfliteInitialized();
 
     final docs = await getApplicationDocumentsDirectory();
     final dbPath = p.join(docs.path, 'shoe_store.db');

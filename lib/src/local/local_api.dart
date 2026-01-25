@@ -8,6 +8,7 @@ import 'package:shoe_store_manager/models/app_user.dart';
 import 'package:shoe_store_manager/models/business.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../../auth/role_store.dart';
 import '../../printing/receipt_pdf_80mm.dart';
 import '../../printing/receipt_preview.dart';
 import '../db/database_manager.dart';
@@ -249,10 +250,7 @@ final Map<String, String> _subcategoryCodes = {
 
 /// Normalizim i tekstit për SKU: uppercase, pa hapësira, hiq karaktere speciale
 String _normalizeForSku(String text) {
-  return text
-      .toUpperCase()
-      .replaceAll(RegExp(r'[^A-Z0-9]'), '')
-      .trim();
+  return text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '').trim();
 }
 
 /// Gjeneron SKU për variant: [CAT]-[SUBCAT]-[NAME]-[SIZE]
@@ -265,7 +263,7 @@ String generateVariantSku({
   final catCode = category != null && _categoryCodes.containsKey(category)
       ? _categoryCodes[category]!
       : 'UNK';
-  
+
   String subCode = 'UNK';
   if (subcategory != null) {
     // Provo fillimisht në subcategoryCodes
@@ -279,14 +277,14 @@ String generateVariantSku({
     // Nëse nuk ka subcategory, përdor category si subcategory
     subCode = _categoryCodes[category] ?? 'UNK';
   }
-  
+
   final nameNormalized = _normalizeForSku(productName);
   final sizeNormalized = _normalizeForSku(size);
-  
+
   if (nameNormalized.isEmpty) {
     throw Exception('Emri i produktit nuk mund të jetë bosh për SKU');
   }
-  
+
   return '$catCode-$subCode-$nameNormalized-$sizeNormalized';
 }
 
@@ -543,7 +541,7 @@ class CartItem {
   final Product product;
   final int size; // Për backward compatibility
   int quantity;
-  
+
   // ✅ NEW: Variant info
   final int? variantId; // ID e variantit (SKU) në product_variants
   final String? variantSku; // SKU e variantit
@@ -562,7 +560,7 @@ class CartItem {
   double get lineTotal => unitPrice * quantity;
   double get lineProfit =>
       (unitPrice - (product.purchasePrice ?? 0)) * quantity;
-  
+
   // ✅ Helper për të identifikuar nëse është variant
   bool get isVariant => variantId != null;
 }
@@ -594,7 +592,7 @@ class LocalApi {
     
     // Initialize DatabaseManager (opens admin DB)
     await DatabaseManager.getAdminDb();
-    
+
     _ready = true;
   }
 
@@ -625,17 +623,13 @@ class LocalApi {
     final adminRows = await db.rawQuery(
       "SELECT id FROM users WHERE username='admin' LIMIT 1",
     );
-    
+
     if (adminRows.isNotEmpty) {
       // ✅ Konverto admin ekzistues në superadmin
       final adminId = adminRows.first['id'] as int;
       await db.update(
         'users',
-        {
-          'username': 'superadmin',
-          'password': '123123',
-          'role': 'superadmin',
-        },
+        {'username': 'superadmin', 'password': '123123', 'role': 'superadmin'},
         where: 'id = ?',
         whereArgs: [adminId],
       );
@@ -657,11 +651,7 @@ class LocalApi {
       if (e.toString().contains('UNIQUE constraint')) {
         await db.update(
           'users',
-          {
-            'password': '123123',
-            'role': 'superadmin',
-            'active': 1,
-          },
+          {'password': '123123', 'role': 'superadmin', 'active': 1},
           where: 'username = ?',
           whereArgs: ['superadmin'],
         );
@@ -701,10 +691,10 @@ class LocalApi {
       whereArgs: [u, u, p0],
       limit: 1,
     );
-    
+
     if (businessRows.isNotEmpty) {
       final businessId = businessRows.first['id'] as int;
-      
+
       // ✅ Hap databazën e biznesit dhe gjej admin user
       final businessDb = await DatabaseManager.getBusinessDb(businessId);
       rows = await businessDb.query(
@@ -713,7 +703,7 @@ class LocalApi {
         whereArgs: [businessId, 'admin'],
         limit: 1,
       );
-      
+
       if (rows.isNotEmpty) {
         return AppUser.fromRow(rows.first);
       }
@@ -722,13 +712,16 @@ class LocalApi {
     throw Exception('User nuk ekziston ose password gabim.');
   }
 
-  Future<List<AppUser>> getUsers({bool onlyActive = true, int? businessId}) async {
+  Future<List<AppUser>> getUsers({
+    bool onlyActive = true,
+    int? businessId,
+  }) async {
     // Nëse businessId është specifikuar, merri nga business DB
     // Përndryshe, merri nga admin DB (superadmin users)
-    final db = businessId != null 
+    final db = businessId != null
         ? await DatabaseManager.getBusinessDb(businessId)
         : await DatabaseManager.getAdminDb();
-        
+
     final rows = await db.query(
       'users',
       where: onlyActive ? 'active = 1' : null,
@@ -740,11 +733,14 @@ class LocalApi {
   Future<List<AppUser>> getAllUsers() async {
     // Merr të gjithë users nga admin DB + të gjitha business DBs
     final adminDb = await DatabaseManager.getAdminDb();
-    final adminUsers = await adminDb.query('users', orderBy: 'createdAtMs DESC');
-    
+    final adminUsers = await adminDb.query(
+      'users',
+      orderBy: 'createdAtMs DESC',
+    );
+
     final allUsers = <AppUser>[];
     allUsers.addAll(adminUsers.map(AppUser.fromRow));
-    
+
     return allUsers;
   }
 
@@ -762,9 +758,9 @@ class LocalApi {
     }
 
     final now = DateTime.now().millisecondsSinceEpoch;
-    
+
     // Përcakto cilin DB të përdorësh
-    final db = businessId != null 
+    final db = businessId != null
         ? await DatabaseManager.getBusinessDb(businessId)
         : await DatabaseManager.getAdminDb();
 
@@ -802,7 +798,7 @@ class LocalApi {
     if (businessId != null) data['businessId'] = businessId;
 
     // Përdor businessId për të përcaktuar DB
-    final db = businessId != null 
+    final db = businessId != null
         ? await DatabaseManager.getBusinessDb(businessId)
         : await DatabaseManager.getAdminDb();
 
@@ -814,10 +810,10 @@ class LocalApi {
   }
 
   Future<void> setUserActive(int userId, bool active, {int? businessId}) async {
-    final db = businessId != null 
+    final db = businessId != null
         ? await DatabaseManager.getBusinessDb(businessId)
         : await DatabaseManager.getAdminDb();
-        
+
     await db.update(
       'users',
       {'active': active ? 1 : 0},
@@ -827,18 +823,18 @@ class LocalApi {
   }
 
   Future<void> deleteUser(int userId, {int? businessId}) async {
-    final db = businessId != null 
+    final db = businessId != null
         ? await DatabaseManager.getBusinessDb(businessId)
         : await DatabaseManager.getAdminDb();
-        
+
     await db.delete('users', where: 'id = ?', whereArgs: [userId]);
   }
 
   Future<AppUser?> getUserById(int userId, {int? businessId}) async {
-    final db = businessId != null 
+    final db = businessId != null
         ? await DatabaseManager.getBusinessDb(businessId)
         : await DatabaseManager.getAdminDb();
-        
+
     final rows = await db.query(
       'users',
       where: 'id = ?',
@@ -904,7 +900,9 @@ class LocalApi {
       final businessDb = await DatabaseManager.getBusinessDb(businessId);
 
       // 3. ✅ Krijo admin user në business DB
-      final usernameForUser = email?.trim().isNotEmpty == true ? email!.trim() : n;
+      final usernameForUser = email?.trim().isNotEmpty == true
+          ? email!.trim()
+          : n;
       await businessDb.insert('users', {
         'username': usernameForUser,
         'password': password,
@@ -919,9 +917,9 @@ class LocalApi {
         'business-$businessId',
         validDays: validDays,
       );
-      
+
       final expiresAtMs = now + (validDays * 24 * 60 * 60 * 1000);
-      
+
       await adminDb.insert('business_licenses', {
         'businessId': businessId,
         'licenseKey': licenseKey,
@@ -962,10 +960,7 @@ class LocalApi {
             whereArgs: [createdByUserId],
             orderBy: 'createdAtMs DESC',
           )
-        : await adminDb.query(
-            'businesses',
-            orderBy: 'createdAtMs DESC',
-          );
+        : await adminDb.query('businesses', orderBy: 'createdAtMs DESC');
     return rows.map(Business.fromRow).toList();
   }
 
@@ -1005,20 +1000,39 @@ class LocalApi {
     if (password != null && password.isNotEmpty) {
       data['password'] = password;
     }
-    if (address != null) data['address'] = address.trim().isEmpty ? null : address.trim();
+    if (address != null)
+      data['address'] = address.trim().isEmpty ? null : address.trim();
     if (city != null) data['city'] = city.trim().isEmpty ? null : city.trim();
-    if (postalCode != null) data['postalCode'] = postalCode.trim().isEmpty ? null : postalCode.trim();
-    if (phone != null) data['phone'] = phone.trim().isEmpty ? null : phone.trim();
-    if (email != null) data['email'] = email.trim().isEmpty ? null : email.trim();
-    if (ownerName != null) data['ownerName'] = ownerName.trim().isEmpty ? null : ownerName.trim();
-    if (taxId != null) data['taxId'] = taxId.trim().isEmpty ? null : taxId.trim();
-    if (registrationNumber != null) data['registrationNumber'] = registrationNumber.trim().isEmpty ? null : registrationNumber.trim();
-    if (contactPerson != null) data['contactPerson'] = contactPerson.trim().isEmpty ? null : contactPerson.trim();
-    if (website != null) data['website'] = website.trim().isEmpty ? null : website.trim();
-    if (notes != null) data['notes'] = notes.trim().isEmpty ? null : notes.trim();
+    if (postalCode != null)
+      data['postalCode'] = postalCode.trim().isEmpty ? null : postalCode.trim();
+    if (phone != null)
+      data['phone'] = phone.trim().isEmpty ? null : phone.trim();
+    if (email != null)
+      data['email'] = email.trim().isEmpty ? null : email.trim();
+    if (ownerName != null)
+      data['ownerName'] = ownerName.trim().isEmpty ? null : ownerName.trim();
+    if (taxId != null)
+      data['taxId'] = taxId.trim().isEmpty ? null : taxId.trim();
+    if (registrationNumber != null)
+      data['registrationNumber'] = registrationNumber.trim().isEmpty
+          ? null
+          : registrationNumber.trim();
+    if (contactPerson != null)
+      data['contactPerson'] = contactPerson.trim().isEmpty
+          ? null
+          : contactPerson.trim();
+    if (website != null)
+      data['website'] = website.trim().isEmpty ? null : website.trim();
+    if (notes != null)
+      data['notes'] = notes.trim().isEmpty ? null : notes.trim();
 
     try {
-      await adminDb.update('businesses', data, where: 'id = ?', whereArgs: [businessId]);
+      await adminDb.update(
+        'businesses',
+        data,
+        where: 'id = ?',
+        whereArgs: [businessId],
+      );
 
       // ✅ Nëse password u ndryshua, përditëso edhe user-in e biznesit
       if (password != null && password.isNotEmpty) {
@@ -1040,13 +1054,21 @@ class LocalApi {
 
   Future<void> deleteBusiness(int businessId) async {
     final adminDb = await DatabaseManager.getAdminDb();
-    
+
     // ✅ Fshi licensat
-    await adminDb.delete('business_licenses', where: 'businessId = ?', whereArgs: [businessId]);
-    
+    await adminDb.delete(
+      'business_licenses',
+      where: 'businessId = ?',
+      whereArgs: [businessId],
+    );
+
     // ✅ Fshi biznesin nga admin DB
-    await adminDb.delete('businesses', where: 'id = ?', whereArgs: [businessId]);
-    
+    await adminDb.delete(
+      'businesses',
+      where: 'id = ?',
+      whereArgs: [businessId],
+    );
+
     // ✅ Fshi databazën e biznesit
     await DatabaseManager.deleteBusinessDatabase(businessId);
   }
@@ -1059,7 +1081,7 @@ class LocalApi {
       where: 'id = ?',
       whereArgs: [businessId],
     );
-    
+
     // ✅ Deaktivizo edhe user-at e biznesit në business DB
     final businessDb = await DatabaseManager.getBusinessDb(businessId);
     await businessDb.update(
@@ -1351,7 +1373,7 @@ class LocalApi {
     if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final b = barcode.trim();
     if (b.isEmpty) return [];
-    
+
     final rows = await db.query(
       'product_variants',
       where: 'barcode = ?',
@@ -1379,11 +1401,12 @@ class LocalApi {
   Future<Product?> getProductByVariantId(int variantId) async {
     final variant = await getVariantById(variantId);
     if (variant == null) return null;
-    
+
     final products = await getProducts();
     return products.firstWhere(
       (p) => p.id == variant.productId,
-      orElse: () => throw Exception('Produkti nuk u gjet për variant ID: $variantId'),
+      orElse: () =>
+          throw Exception('Produkti nuk u gjet për variant ID: $variantId'),
     );
   }
 
@@ -1421,7 +1444,9 @@ class LocalApi {
         'imagePath': imagePath,
         'sizeStockJson': _encodeSizeStock(sizeStock),
         'category': category?.trim().isEmpty == true ? null : category?.trim(),
-        'subcategory': subcategory?.trim().isEmpty == true ? null : subcategory?.trim(),
+        'subcategory': subcategory?.trim().isEmpty == true
+            ? null
+            : subcategory?.trim(),
         'createdAtMs': now,
         'updatedAtMs': now,
       };
@@ -1504,7 +1529,9 @@ class LocalApi {
         'imagePath': imagePath,
         'sizeStockJson': _encodeSizeStock(sizeStock),
         'category': category?.trim().isEmpty == true ? null : category?.trim(),
-        'subcategory': subcategory?.trim().isEmpty == true ? null : subcategory?.trim(),
+        'subcategory': subcategory?.trim().isEmpty == true
+            ? null
+            : subcategory?.trim(),
         'updatedAtMs': now,
       };
 
@@ -1512,7 +1539,11 @@ class LocalApi {
 
       // Fshi variantet e vjetra dhe krijo të rejat
       if (autoGenerateVariants && (category != null || subcategory != null)) {
-        await tx.delete('product_variants', where: 'productId = ?', whereArgs: [id]);
+        await tx.delete(
+          'product_variants',
+          where: 'productId = ?',
+          whereArgs: [id],
+        );
 
         for (final entry in sizeStock.entries) {
           final size = entry.key;
@@ -1556,7 +1587,11 @@ class LocalApi {
     if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     await db.transaction((tx) async {
       // Fshi variantet (CASCADE do ta bëjë automatikisht, por e bëjmë eksplicit)
-      await tx.delete('product_variants', where: 'productId = ?', whereArgs: [id]);
+      await tx.delete(
+        'product_variants',
+        where: 'productId = ?',
+        whereArgs: [id],
+      );
       await tx.delete('products', where: 'id = ?', whereArgs: [id]);
     });
   }
@@ -1734,17 +1769,14 @@ class LocalApi {
           if (variantRows.isNotEmpty) {
             final variant = ProductVariant.fromRow(variantRows.first);
             final newQty = variant.quantity - item.quantity;
-            
+
             await tx.update(
               'product_variants',
-              {
-                'quantity': newQty,
-                'updatedAtMs': nowMs,
-              },
+              {'quantity': newQty, 'updatedAtMs': nowMs},
               where: 'id = ?',
               whereArgs: [item.variantId],
             );
-            
+
             // ✅ Përditëso edhe produktin bazë (sizeStockJson) për backward compatibility
             final prodRows = await tx.query(
               'products',
@@ -1758,7 +1790,7 @@ class LocalApi {
               final sizeInt = int.tryParse(variant.size) ?? item.size;
               map[sizeInt] = (map[sizeInt] ?? 0) - item.quantity;
               final newTotal = _totalStock(map);
-              
+
               await tx.update(
                 'products',
                 {
@@ -2499,33 +2531,31 @@ WHERE ${where.join(' AND ')}
     for (int i = days - 1; i >= 0; i--) {
       final date = now.subtract(Duration(days: i));
       final dayK = dayKey(date);
-      
+
       final rows = await db.rawQuery(
         'SELECT COALESCE(SUM(total),0) as total, COUNT(*) as count '
         'FROM sales WHERE dayKey = ? AND revertedAtMs IS NULL',
         [dayK],
       );
-      
+
       final total = ((rows.first['total'] as num?) ?? 0).toDouble();
       final count = (rows.first['count'] as int?) ?? 0;
-      
-      data.add({
-        'date': date,
-        'dayKey': dayK,
-        'total': total,
-        'count': count,
-      });
+
+      data.add({'date': date, 'dayKey': dayK, 'total': total, 'count': count});
     }
 
     return data;
   }
 
   /// Get best selling products
-  Future<List<Map<String, dynamic>>> getBestSellingProducts({int limit = 10}) async {
+  Future<List<Map<String, dynamic>>> getBestSellingProducts({
+    int limit = 10,
+  }) async {
     final db = await DatabaseManager.getCurrentBusinessDb();
     if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
-    
-    final rows = await db.rawQuery('''
+
+    final rows = await db.rawQuery(
+      '''
       SELECT 
         si.productId,
         p.name,
@@ -2541,25 +2571,75 @@ WHERE ${where.join(' AND ')}
       GROUP BY si.productId
       ORDER BY totalSold DESC
       LIMIT ?
-    ''', [limit]);
+    ''',
+      [limit],
+    );
 
-    return rows.map((r) => {
-      'productId': r['productId'] as int,
-      'name': r['name'] as String? ?? '',
-      'imagePath': r['imagePath'] as String?,
-      'price': ((r['price'] as num?) ?? 0).toDouble(),
-      'discountPercent': ((r['discountPercent'] as num?) ?? 0).toDouble(),
-      'stockQty': (r['stockQty'] as int?) ?? 0,
-      'totalSold': (r['totalSold'] as int?) ?? 0,
-    }).toList();
+    return rows
+        .map(
+          (r) => {
+            'productId': r['productId'] as int,
+            'name': r['name'] as String? ?? '',
+            'imagePath': r['imagePath'] as String?,
+            'price': ((r['price'] as num?) ?? 0).toDouble(),
+            'discountPercent': ((r['discountPercent'] as num?) ?? 0).toDouble(),
+            'stockQty': (r['stockQty'] as int?) ?? 0,
+            'totalSold': (r['totalSold'] as int?) ?? 0,
+          },
+        )
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getSalesChartData({int days = 7}) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+
+    final now = DateTime.now();
+    final from = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: days - 1));
+    final fromMs = from.millisecondsSinceEpoch;
+
+    final rows = await db.rawQuery(
+      '''
+    SELECT
+      strftime('%Y-%m-%d', (createdAtMs / 1000), 'unixepoch') AS dayKey,
+      COALESCE(SUM(total), 0) AS total
+    FROM sales
+    WHERE createdAtMs >= ? AND revertedAtMs IS NULL
+    GROUP BY dayKey
+    ORDER BY dayKey ASC
+    ''',
+      [fromMs],
+    );
+
+    // map ditë -> total
+    final byDay = <String, double>{
+      for (final r in rows)
+        (r['dayKey'] as String): ((r['total'] as num?)?.toDouble() ?? 0.0),
+    };
+
+    // mbush edhe ditët që s’kanë shitje me 0 (që chart mos lëviz)
+    final out = <Map<String, dynamic>>[];
+    for (int i = 0; i < days; i++) {
+      final d = from.add(Duration(days: i));
+      final key =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      out.add({'dayKey': key, 'total': byDay[key] ?? 0.0});
+    }
+
+    return out;
   }
 
   /// Get recent sales for payments list
   Future<List<Map<String, dynamic>>> getRecentSales({int limit = 5}) async {
     final db = await DatabaseManager.getCurrentBusinessDb();
     if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
-    
-    final rows = await db.rawQuery('''
+
+    final rows = await db.rawQuery(
+      '''
       SELECT 
         id,
         invoiceNo,
@@ -2570,29 +2650,35 @@ WHERE ${where.join(' AND ')}
       WHERE revertedAtMs IS NULL
       ORDER BY createdAtMs DESC
       LIMIT ?
-    ''', [limit]);
+    ''',
+      [limit],
+    );
 
-    return rows.map((r) => {
-      'id': r['id'] as int,
-      'invoiceNo': r['invoiceNo'] as String? ?? '',
-      'total': ((r['total'] as num?) ?? 0).toDouble(),
-      'createdAtMs': (r['createdAtMs'] as int?) ?? 0,
-      'userId': r['userId'] as int?,
-    }).toList();
+    return rows
+        .map(
+          (r) => {
+            'id': r['id'] as int,
+            'invoiceNo': r['invoiceNo'] as String? ?? '',
+            'total': ((r['total'] as num?) ?? 0).toDouble(),
+            'createdAtMs': (r['createdAtMs'] as int?) ?? 0,
+            'userId': r['userId'] as int?,
+          },
+        )
+        .toList();
   }
 
   // ================= FITIMET / SALES LIST =================
-  
+
   Future<List<Map<String, dynamic>>> getSalesForPeriod({
     required String period, // 'today', 'week', 'month'
   }) async {
     final db = await DatabaseManager.getCurrentBusinessDb();
     if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final now = DateTime.now();
-    
+
     String whereClause = 'revertedAtMs IS NULL';
     List<dynamic> args = [];
-    
+
     if (period == 'today') {
       final todayK = dayKey(now);
       whereClause += ' AND dayKey = ?';
@@ -2607,7 +2693,7 @@ WHERE ${where.join(' AND ')}
       whereClause += ' AND monthKey = ?';
       args.add(monthK);
     }
-    
+
     final rows = await db.rawQuery('''
       SELECT 
         id,
@@ -2621,14 +2707,18 @@ WHERE ${where.join(' AND ')}
       ORDER BY createdAtMs DESC
     ''', args);
 
-    return rows.map((r) => {
-      'id': r['id'] as int,
-      'invoiceNo': r['invoiceNo'] as String? ?? '',
-      'total': ((r['total'] as num?) ?? 0).toDouble(),
-      'profitTotal': ((r['profitTotal'] as num?) ?? 0).toDouble(),
-      'createdAtMs': (r['createdAtMs'] as int?) ?? 0,
-      'userId': r['userId'] as int?,
-    }).toList();
+    return rows
+        .map(
+          (r) => {
+            'id': r['id'] as int,
+            'invoiceNo': r['invoiceNo'] as String? ?? '',
+            'total': ((r['total'] as num?) ?? 0).toDouble(),
+            'profitTotal': ((r['profitTotal'] as num?) ?? 0).toDouble(),
+            'createdAtMs': (r['createdAtMs'] as int?) ?? 0,
+            'userId': r['userId'] as int?,
+          },
+        )
+        .toList();
   }
 
   Future<Map<String, double>> getProfitSummary({
@@ -2637,10 +2727,10 @@ WHERE ${where.join(' AND ')}
     final db = await DatabaseManager.getCurrentBusinessDb();
     if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final now = DateTime.now();
-    
+
     String whereClause = 'revertedAtMs IS NULL';
     List<dynamic> args = [];
-    
+
     if (period == 'today') {
       final todayK = dayKey(now);
       whereClause += ' AND dayKey = ?';
@@ -2655,7 +2745,7 @@ WHERE ${where.join(' AND ')}
       whereClause += ' AND monthKey = ?';
       args.add(monthK);
     }
-    
+
     // Get sales totals
     final salesRows = await db.rawQuery('''
       SELECT 
@@ -2665,15 +2755,17 @@ WHERE ${where.join(' AND ')}
       FROM sales
       WHERE $whereClause
     ''', args);
-    
-    final totalSales = ((salesRows.first['totalSales'] as num?) ?? 0).toDouble();
-    final totalProfit = ((salesRows.first['totalProfit'] as num?) ?? 0).toDouble();
+
+    final totalSales = ((salesRows.first['totalSales'] as num?) ?? 0)
+        .toDouble();
+    final totalProfit = ((salesRows.first['totalProfit'] as num?) ?? 0)
+        .toDouble();
     final count = (salesRows.first['count'] as int?) ?? 0;
-    
+
     // Get expenses for period
     String expenseWhere = '1=1';
     List<dynamic> expenseArgs = [];
-    
+
     if (period == 'today') {
       final todayK = dayKey(now);
       expenseWhere += ' AND dayKey = ?';
@@ -2688,16 +2780,17 @@ WHERE ${where.join(' AND ')}
       expenseWhere += ' AND monthKey = ?';
       expenseArgs.add(monthK);
     }
-    
+
     final expenseRows = await db.rawQuery('''
       SELECT COALESCE(SUM(amount),0) as totalExpenses
       FROM expenses
       WHERE $expenseWhere
     ''', expenseArgs);
-    
-    final totalExpenses = ((expenseRows.first['totalExpenses'] as num?) ?? 0).toDouble();
+
+    final totalExpenses = ((expenseRows.first['totalExpenses'] as num?) ?? 0)
+        .toDouble();
     final netProfit = totalProfit - totalExpenses;
-    
+
     return {
       'totalSales': totalSales,
       'totalProfit': totalProfit,
@@ -2708,7 +2801,7 @@ WHERE ${where.join(' AND ')}
   }
 
   // ================= SHPENZIMET =================
-  
+
   Future<List<Map<String, dynamic>>> getExpensesForPeriod({
     required String period, // 'today', 'week', 'month'
     String? categoryFilter, // null = all, or specific category
@@ -2716,10 +2809,10 @@ WHERE ${where.join(' AND ')}
     final db = await DatabaseManager.getCurrentBusinessDb();
     if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final now = DateTime.now();
-    
+
     String whereClause = 'revertedAtMs IS NULL';
     List<dynamic> args = [];
-    
+
     if (period == 'today') {
       final todayK = dayKey(now);
       whereClause += ' AND dayKey = ?';
@@ -2734,12 +2827,12 @@ WHERE ${where.join(' AND ')}
       whereClause += ' AND monthKey = ?';
       args.add(monthK);
     }
-    
+
     if (categoryFilter != null && categoryFilter.isNotEmpty) {
       whereClause += ' AND category = ?';
       args.add(categoryFilter);
     }
-    
+
     final expenseRows = await db.rawQuery('''
       SELECT 
         id,
@@ -2752,11 +2845,11 @@ WHERE ${where.join(' AND ')}
       WHERE $whereClause
       ORDER BY createdAtMs DESC
     ''', args);
-    
+
     // Get investments (blerje malli)
     String invWhere = 'revertedAtMs IS NULL';
     List<dynamic> invArgs = [];
-    
+
     if (period == 'today') {
       final todayK = dayKey(now);
       invWhere += ' AND dayKey = ?';
@@ -2771,7 +2864,7 @@ WHERE ${where.join(' AND ')}
       invWhere += ' AND monthKey = ?';
       invArgs.add(monthK);
     }
-    
+
     final investRows = await db.rawQuery('''
       SELECT 
         id,
@@ -2786,10 +2879,12 @@ WHERE ${where.join(' AND ')}
 
     // Combine both lists
     final allExpenses = <Map<String, dynamic>>[];
-    
+
     // Add expenses
     for (final row in expenseRows) {
-      if (categoryFilter == null || categoryFilter == 'all' || categoryFilter.isEmpty) {
+      if (categoryFilter == null ||
+          categoryFilter == 'all' ||
+          categoryFilter.isEmpty) {
         allExpenses.add({
           'id': row['id'] as int,
           'category': row['category'] as String,
@@ -2809,9 +2904,12 @@ WHERE ${where.join(' AND ')}
         });
       }
     }
-    
+
     // Add investments if no category filter or if filter is 'Blerje Malli'
-    if (categoryFilter == null || categoryFilter == 'all' || categoryFilter.isEmpty || categoryFilter == 'Blerje Malli') {
+    if (categoryFilter == null ||
+        categoryFilter == 'all' ||
+        categoryFilter.isEmpty ||
+        categoryFilter == 'Blerje Malli') {
       for (final row in investRows) {
         allExpenses.add({
           'id': row['id'] as int,
@@ -2823,10 +2921,12 @@ WHERE ${where.join(' AND ')}
         });
       }
     }
-    
+
     // Sort by date descending
-    allExpenses.sort((a, b) => (b['createdAtMs'] as int).compareTo(a['createdAtMs'] as int));
-    
+    allExpenses.sort(
+      (a, b) => (b['createdAtMs'] as int).compareTo(a['createdAtMs'] as int),
+    );
+
     return allExpenses;
   }
 
@@ -2836,10 +2936,10 @@ WHERE ${where.join(' AND ')}
     final db = await DatabaseManager.getCurrentBusinessDb();
     if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
     final now = DateTime.now();
-    
+
     String whereClause = 'revertedAtMs IS NULL';
     List<dynamic> args = [];
-    
+
     if (period == 'today') {
       final todayK = dayKey(now);
       whereClause += ' AND dayKey = ?';
@@ -2854,31 +2954,32 @@ WHERE ${where.join(' AND ')}
       whereClause += ' AND monthKey = ?';
       args.add(monthK);
     }
-    
+
     // Get expenses
     final expenseRows = await db.rawQuery('''
-      SELECT 
+      SELECT
         COALESCE(SUM(amount),0) as total,
         COUNT(*) as count
       FROM expenses
       WHERE $whereClause
     ''', args);
-    
+
     // Get investments
     final investRows = await db.rawQuery('''
-      SELECT 
+      SELECT
         COALESCE(SUM(amount),0) as total,
         COUNT(*) as count
       FROM investments
       WHERE $whereClause
     ''', args);
-    
-    final expensesTotal = ((expenseRows.first['total'] as num?) ?? 0).toDouble();
+
+    final expensesTotal = ((expenseRows.first['total'] as num?) ?? 0)
+        .toDouble();
     final expensesCount = (expenseRows.first['count'] as int?) ?? 0;
-    
+
     final investTotal = ((investRows.first['total'] as num?) ?? 0).toDouble();
     final investCount = (investRows.first['count'] as int?) ?? 0;
-    
+
     return {
       'expensesTotal': expensesTotal,
       'expensesCount': expensesCount.toDouble(),
@@ -2887,5 +2988,15 @@ WHERE ${where.join(' AND ')}
       'grandTotal': expensesTotal + investTotal,
       'totalCount': (expensesCount + investCount).toDouble(),
     };
+  }
+
+  // ================= GET CURRENT BUSINESS NAME =================
+
+  Future<String> getCurrentBusinessName() async {
+    final businessId = await RoleStore.getBusinessId();
+    if (businessId == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final business = await getBusinessById(businessId);
+    if (business == null) throw Exception('Biznesi nuk u gjet.');
+    return business.name;
   }
 }

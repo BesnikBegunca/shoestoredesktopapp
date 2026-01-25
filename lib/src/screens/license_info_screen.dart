@@ -28,7 +28,7 @@ class _LicenseInfoScreenState extends State<LicenseInfoScreen> {
 
   Future<void> _loadLicenseInfo() async {
     setState(() => _loading = true);
-    
+
     try {
       final businessId = await RoleStore.getBusinessId();
       if (businessId == null) {
@@ -47,18 +47,6 @@ class _LicenseInfoScreenState extends State<LicenseInfoScreen> {
       });
     } catch (e) {
       setState(() => _loading = false);
-    }
-  }
-
-  void _copyLicenseKey() {
-    if (_licenseInfo?.licenseKey != null) {
-      Clipboard.setData(ClipboardData(text: _licenseInfo!.licenseKey));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Çelësi i licensës u kopjua!'),
-          duration: Duration(seconds: 2),
-        ),
-      );
     }
   }
 
@@ -199,7 +187,7 @@ class _LicenseInfoScreenState extends State<LicenseInfoScreen> {
                               ),
                             ],
                             const SizedBox(height: 30),
-                            
+
                             // Days Remaining Card
                             Container(
                               width: 500,
@@ -246,9 +234,9 @@ class _LicenseInfoScreenState extends State<LicenseInfoScreen> {
                                 ],
                               ),
                             ),
-                            
+
                             const SizedBox(height: 30),
-                            
+
                             // License Details
                             Container(
                               width: 500,
@@ -260,44 +248,31 @@ class _LicenseInfoScreenState extends State<LicenseInfoScreen> {
                               ),
                               child: Column(
                                 children: [
-                                  _buildInfoRow('Data e Lëshimit', _licenseInfo!.issuedAtFormatted),
+                                  _buildInfoRow(
+                                    'Data e Lëshimit',
+                                    _licenseInfo!.issuedAtFormatted,
+                                  ),
                                   const Divider(height: 24),
-                                  _buildInfoRow('Data e Skadimit', _licenseInfo!.expiresAtFormatted),
+                                  _buildInfoRow(
+                                    'Data e Skadimit',
+                                    _licenseInfo!.expiresAtFormatted,
+                                  ),
                                   const Divider(height: 24),
-                                  _buildInfoRow('Validiteti', '${_licenseInfo!.validDays} ditë'),
+                                  _buildInfoRow(
+                                    'Validiteti',
+                                    '${_licenseInfo!.validDays} ditë',
+                                  ),
                                   const Divider(height: 24),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Text(
-                                        'Çelësi i Licensës',
-                                        style: TextStyle(
-                                          color: AppTheme.muted,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 12,
-                                        ),
-                                      ),
                                       Row(
                                         children: [
                                           Container(
-                                            constraints: const BoxConstraints(maxWidth: 200),
-                                            child: Text(
-                                              _licenseInfo!.licenseKey,
-                                              style: const TextStyle(
-                                                color: AppTheme.text,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 11,
-                                                fontFamily: 'monospace',
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
+                                            constraints: const BoxConstraints(
+                                              maxWidth: 200,
                                             ),
-                                          ),
-                                          IconButton(
-                                            onPressed: _copyLicenseKey,
-                                            icon: const Icon(Icons.copy, size: 16),
-                                            padding: const EdgeInsets.all(4),
-                                            constraints: const BoxConstraints(),
-                                            tooltip: 'Kopjo',
                                           ),
                                         ],
                                       ),
@@ -306,9 +281,9 @@ class _LicenseInfoScreenState extends State<LicenseInfoScreen> {
                                 ],
                               ),
                             ),
-                            
+
                             const SizedBox(height: 20),
-                            
+
                             if (_licenseInfo!.isExpired)
                               Container(
                                 padding: const EdgeInsets.all(12),
@@ -319,7 +294,11 @@ class _LicenseInfoScreenState extends State<LicenseInfoScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                                    const Icon(
+                                      Icons.error_outline,
+                                      color: Colors.red,
+                                      size: 20,
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -344,7 +323,11 @@ class _LicenseInfoScreenState extends State<LicenseInfoScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+                                    const Icon(
+                                      Icons.warning_amber,
+                                      color: Colors.orange,
+                                      size: 20,
+                                    ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(

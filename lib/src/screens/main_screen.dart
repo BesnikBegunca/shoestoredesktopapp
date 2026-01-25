@@ -23,27 +23,27 @@ class CartDisplayItem {
 String formatSizeLabel(int size) {
   switch (size) {
     case 1000:
-      return '0–3m';
+      return '0-3M';
     case 1001:
-      return '3–6m';
+      return '3-6M';
     case 1002:
-      return '6–9m';
+      return '6-9M';
     case 1003:
-      return '9–12m';
+      return '9-12M';
     case 1004:
-      return '12–18m';
+      return '12-18M';
     case 1005:
-      return '18–24m';
+      return '18-24M';
     case 1006:
-      return '2y';
+      return '2Y';
     case 1007:
-      return '3y';
+      return '3Y';
     case 1008:
-      return '4y';
+      return '4Y';
     case 1009:
-      return '5y';
+      return '5Y';
     case 1010:
-      return '6y';
+      return '6Y';
     default:
       return size.toString(); // normal shoe sizes (36,37..)
   }
@@ -565,6 +565,9 @@ class _MainScreenState extends State<MainScreen> {
 
       if (!mounted) return;
 
+      // Get business name for receipt
+      final businessName = await LocalApi.I.getCurrentBusinessName();
+
       // Show success dialog
       showDialog(
         context: context,
@@ -581,7 +584,7 @@ class _MainScreenState extends State<MainScreen> {
             );
 
             await ReceiptPdf80mm.printOrSave(
-              title: 'SHOESTORE',
+              title: businessName,
               lines: lines,
               jobName: res.invoiceNo,
             );
@@ -1332,7 +1335,8 @@ class _ProductDialogState extends State<_ProductDialog> {
 
         // ✅ PREVIEW (nuk mbyllet dialogu)
         FilledButton.tonalIcon(
-          onPressed: () {
+          onPressed: () async {
+            final businessName = await LocalApi.I.getCurrentBusinessName();
             final lines = buildReceiptLines(
               invoiceNo: soldInvoice ?? 'INV-TEST',
               date: DateTime.now(),
@@ -1349,7 +1353,7 @@ class _ProductDialogState extends State<_ProductDialog> {
               context,
               MaterialPageRoute(
                 builder: (_) => ReceiptPreview(
-                  title: 'SHOESTORE',
+                  title: businessName,
                   lines: lines,
                   widthMm: 80,
                 ),
@@ -1365,6 +1369,7 @@ class _ProductDialogState extends State<_ProductDialog> {
         // ✅ PRINT (PDF 80mm) + pastaj e mbyll dialogun
         FilledButton.icon(
           onPressed: () async {
+            final businessName = await LocalApi.I.getCurrentBusinessName();
             final lines = buildReceiptLines(
               invoiceNo: soldInvoice ?? 'INV-TEST',
               date: DateTime.now(),
@@ -1378,7 +1383,7 @@ class _ProductDialogState extends State<_ProductDialog> {
             );
 
             await ReceiptPdf80mm.printOrSave(
-              title: 'SHOESTORE',
+              title: businessName,
               lines: lines,
               jobName: soldInvoice ?? 'receipt',
             );

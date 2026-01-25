@@ -101,24 +101,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
       'Patika verore',
       'Patika dimërore',
     ],
-    'Rroba Stinore': [
-      'Verore',
-      'Dimërore',
-      'Pranverë / Vjeshtë',
-    ],
-    'Rroba Sportive': [
-      'Trenerka',
-      'Sete sportive',
-    ],
-    'Rroba Gjumi': [
-      'Pizhama',
-      'Robe gjumi',
-    ],
-    'Aksesorë': [
-      'Kapele',
-      'Çorape',
-      'Shami',
-    ],
+    'Rroba Stinore': ['Verore', 'Dimërore', 'Pranverë / Vjeshtë'],
+    'Rroba Sportive': ['Trenerka', 'Sete sportive'],
+    'Rroba Gjumi': ['Pizhama', 'Robe gjumi'],
+    'Aksesorë': ['Kapele', 'Çorape', 'Shami'],
   };
 
   Map<String, List<String>> categoryTags = {};
@@ -399,7 +385,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
 
     final previews = <String>[];
-    
+
     if (kind == ProductKind.shoes) {
       // Për patika: masat janë numra (17-30)
       for (final entry in sizeStock.entries) {
@@ -439,7 +425,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         }
       }
     }
-    
+
     return previews;
   }
 
@@ -607,19 +593,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
-  Widget _buildPanel({
-    required String title,
-    required List<Widget> children,
-  }) {
+  Widget _buildPanel({required String title, required List<Widget> children}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey.shade300,
-          width: 1,
-        ),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -661,9 +641,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             fontWeight: FontWeight.w600,
           ),
           hintText: hint,
-          hintStyle: TextStyle(
-            color: Colors.grey.shade600,
-          ),
+          hintStyle: TextStyle(color: Colors.grey.shade600),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: Colors.grey.shade300),
@@ -699,9 +677,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             fontWeight: FontWeight.w600,
           ),
           hintText: hint,
-          hintStyle: TextStyle(
-            color: Colors.grey.shade600,
-          ),
+          hintStyle: TextStyle(color: Colors.grey.shade600),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: Colors.grey.shade300),
@@ -716,10 +692,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
         ),
         items: items.map((item) {
-          return DropdownMenuItem(
-            value: item,
-            child: Text(item),
-          );
+          return DropdownMenuItem(value: item, child: Text(item));
         }).toList(),
         onChanged: (value) {
           if (value != null) {
@@ -763,9 +736,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             // Header
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-              decoration: const BoxDecoration(
-                color: AppTheme.bgPage,
-              ),
+              decoration: const BoxDecoration(color: AppTheme.bgPage),
               child: Row(
                 children: [
                   SvgPicture.asset(
@@ -864,7 +835,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 16),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         const Text(
                                           'SKU (Auto-gjeneruar)',
@@ -880,7 +852,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                             padding: const EdgeInsets.all(12),
                                             decoration: BoxDecoration(
                                               color: Colors.grey.shade100,
-                                              borderRadius: BorderRadius.circular(8),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                               border: Border.all(
                                                 color: Colors.grey.shade300,
                                               ),
@@ -898,22 +871,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                             padding: const EdgeInsets.all(12),
                                             decoration: BoxDecoration(
                                               color: Colors.blue.shade50,
-                                              borderRadius: BorderRadius.circular(8),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                               border: Border.all(
                                                 color: Colors.blue.shade200,
                                               ),
                                             ),
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: previews.map((preview) {
                                                 return Padding(
-                                                  padding: const EdgeInsets.only(bottom: 4),
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        bottom: 4,
+                                                      ),
                                                   child: Text(
                                                     preview,
                                                     style: const TextStyle(
                                                       color: Colors.black87,
                                                       fontSize: 12,
-                                                      fontWeight: FontWeight.w500,
+                                                      fontWeight:
+                                                          FontWeight.w500,
                                                     ),
                                                   ),
                                                 );
@@ -962,7 +941,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           fit: BoxFit.cover,
                                           errorBuilder: (_, __, ___) =>
                                               const Center(
-                                                  child: Icon(Icons.broken_image)),
+                                                child: Icon(Icons.broken_image),
+                                              ),
                                         ),
                                       )
                                     : Center(
@@ -1032,19 +1012,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               ValueListenableBuilder<TextEditingValue>(
                                 valueListenable: categoryC,
                                 builder: (context, categoryValue, child) {
-                                  final selectedCategory = categoryValue.text.isEmpty ? null : categoryValue.text;
-                                  final availableTags = getTagsForCategory(selectedCategory);
+                                  final selectedCategory =
+                                      categoryValue.text.isEmpty
+                                      ? null
+                                      : categoryValue.text;
+                                  final availableTags = getTagsForCategory(
+                                    selectedCategory,
+                                  );
                                   // Clear tag if it's not in the new list
-                                  if (tagsC.text.isNotEmpty && !availableTags.contains(tagsC.text)) {
-                                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                                      if (mounted) tagsC.clear();
-                                    });
+                                  if (tagsC.text.isNotEmpty &&
+                                      !availableTags.contains(tagsC.text)) {
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          if (mounted) tagsC.clear();
+                                        });
                                   }
                                   return _buildDropdown(
                                     controller: tagsC,
                                     label: 'Etiketat e Produktit',
                                     items: availableTags,
-                                    hint: selectedCategory == null ? 'Zgjedh kategori fillimisht' : 'Zgjedh etiketa',
+                                    hint: selectedCategory == null
+                                        ? 'Zgjedh kategori fillimisht'
+                                        : 'Zgjedh etiketa',
                                   );
                                 },
                               ),
@@ -1068,7 +1057,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                   const Spacer(),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 14, vertical: 8),
+                                      horizontal: 14,
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.black87.withOpacity(0.08),
                                       borderRadius: BorderRadius.circular(8),
@@ -1151,9 +1142,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             // Footer with Save Button
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-              decoration: const BoxDecoration(
-                color: AppTheme.bgPage,
-              ),
+              decoration: const BoxDecoration(color: AppTheme.bgPage),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [

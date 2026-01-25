@@ -15,7 +15,7 @@ class DatabaseManager {
   static bool _isInitialized = false;
   
   static const int kAdminDbVersion = 1;
-  static const int kBusinessDbVersion = 11; // same as current version
+  static const int kBusinessDbVersion = 13; // Added business_category_sizes table
   
   /// Inicializo sqflite FFI në mënyrë të sigurt (vetëm një herë)
   /// Ky funksion mund të përdoret nga çdo vend në aplikacion
@@ -323,6 +323,42 @@ class DatabaseManager {
       )
     ''');
     
+    // Business Categories table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS business_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        createdAtMs INTEGER NOT NULL,
+        UNIQUE(name)
+      )
+    ''');
+    
+    // Business Subcategories table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS business_subcategories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        categoryId INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        createdAtMs INTEGER NOT NULL,
+        FOREIGN KEY (categoryId) REFERENCES business_categories(id) ON DELETE CASCADE,
+        UNIQUE(categoryId, name)
+      )
+    ''');
+    
+    // Business Category Sizes table (për numrat/madhësitë e kategorive)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS business_category_sizes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        categoryId INTEGER NOT NULL,
+        sizeType TEXT NOT NULL, -- 'numeric' ose 'text'
+        sizeValue TEXT NOT NULL, -- numri (p.sh. '17', '18') ose teksti (p.sh. 'S', 'M', 'L')
+        displayOrder INTEGER NOT NULL DEFAULT 0,
+        createdAtMs INTEGER NOT NULL,
+        FOREIGN KEY (categoryId) REFERENCES business_categories(id) ON DELETE CASCADE,
+        UNIQUE(categoryId, sizeValue)
+      )
+    ''');
+    
     // Settlements table
     await db.execute('''
       CREATE TABLE IF NOT EXISTS settlements (
@@ -351,6 +387,48 @@ class DatabaseManager {
       } catch (_) {}
       try {
         await db.execute('ALTER TABLE users ADD COLUMN businessId INTEGER');
+      } catch (_) {}
+    }
+    if (oldVersion < 12) {
+      // Add business_categories and business_subcategories tables
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS business_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            createdAtMs INTEGER NOT NULL,
+            UNIQUE(name)
+          )
+        ''');
+      } catch (_) {}
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS business_subcategories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            categoryId INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            createdAtMs INTEGER NOT NULL,
+            FOREIGN KEY (categoryId) REFERENCES business_categories(id) ON DELETE CASCADE,
+            UNIQUE(categoryId, name)
+          )
+        ''');
+      } catch (_) {}
+    }
+    if (oldVersion < 13) {
+      // Add business_category_sizes table
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS business_category_sizes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            categoryId INTEGER NOT NULL,
+            sizeType TEXT NOT NULL,
+            sizeValue TEXT NOT NULL,
+            displayOrder INTEGER NOT NULL DEFAULT 0,
+            createdAtMs INTEGER NOT NULL,
+            FOREIGN KEY (categoryId) REFERENCES business_categories(id) ON DELETE CASCADE,
+            UNIQUE(categoryId, sizeValue)
+          )
+        ''');
       } catch (_) {}
     }
   }

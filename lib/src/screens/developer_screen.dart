@@ -33,6 +33,19 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
   final _phoneController = TextEditingController();
   final _taxIdController = TextEditingController();
   final _businessPasswordController = TextEditingController();
+  
+  // Category settings
+  bool _useDefaultCategories = true;
+  final Map<String, List<String>> _customCategories = {};
+  final Map<String, List<String>> _customCategorySizes = {}; // categoryName -> [sizes]
+  final _categoryNameController = TextEditingController();
+  final _subcategoryNameController = TextEditingController();
+  final _sizeValueController = TextEditingController();
+  String? _selectedCategoryForSubcategory;
+  String? _selectedCategoryForSize;
+  
+  // License settings
+  final _validDaysController = TextEditingController(text: '365');
 
   @override
   void dispose() {
@@ -43,6 +56,10 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
     _phoneController.dispose();
     _taxIdController.dispose();
     _businessPasswordController.dispose();
+    _categoryNameController.dispose();
+    _subcategoryNameController.dispose();
+    _sizeValueController.dispose();
+    _validDaysController.dispose();
     super.dispose();
   }
 
@@ -157,6 +174,8 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
       // Get current logged-in user ID
       final createdByUserId = await RoleStore.getUserId();
 
+      final validDays = int.tryParse(_validDaysController.text.trim()) ?? 365;
+      
       await LocalApi.I.createBusiness(
         name: name,
         password: password,
@@ -165,6 +184,10 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
         phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
         taxId: _taxIdController.text.trim().isEmpty ? null : _taxIdController.text.trim(),
         createdByUserId: createdByUserId,
+        validDays: validDays,
+        useDefaultCategories: _useDefaultCategories,
+        customCategories: _useDefaultCategories ? null : (_customCategories.isEmpty ? null : _customCategories),
+        customCategorySizes: _useDefaultCategories ? null : (_customCategorySizes.isEmpty ? null : _customCategorySizes),
       );
 
       _showSuccess('Biznesi "$name" u shtua me sukses!');
@@ -708,6 +731,451 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
                     ),
                     const SizedBox(height: 24),
                     
+                    // License Settings
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Licensa',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: _buildTextField(
+                                  controller: _validDaysController,
+                                  label: 'Ditë të Vlefshme',
+                                  icon: Icons.calendar_today,
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 3,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.remove_circle_outline, size: 28),
+                                      onPressed: () {
+                                        final current = int.tryParse(_validDaysController.text.trim()) ?? 365;
+                                        if (current > 1) {
+                                          setState(() {
+                                            _validDaysController.text = (current - 1).toString();
+                                          });
+                                        }
+                                      },
+                                      tooltip: 'Ul me 1',
+                                      color: const Color(0xFF6366F1),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    IconButton(
+                                      icon: const Icon(Icons.add_circle_outline, size: 28),
+                                      onPressed: () {
+                                        final current = int.tryParse(_validDaysController.text.trim()) ?? 365;
+                                        setState(() {
+                                          _validDaysController.text = (current + 1).toString();
+                                        });
+                                      },
+                                      tooltip: 'Rrit me 1',
+                                      color: const Color(0xFF6366F1),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    IconButton(
+                                      icon: const Icon(Icons.remove_circle, size: 32),
+                                      onPressed: () {
+                                        final current = int.tryParse(_validDaysController.text.trim()) ?? 365;
+                                        if (current > 10) {
+                                          setState(() {
+                                            _validDaysController.text = (current - 10).toString();
+                                          });
+                                        }
+                                      },
+                                      tooltip: 'Ul me 10',
+                                      color: const Color(0xFF10B981),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    IconButton(
+                                      icon: const Icon(Icons.add_circle, size: 32),
+                                      onPressed: () {
+                                        final current = int.tryParse(_validDaysController.text.trim()) ?? 365;
+                                        setState(() {
+                                          _validDaysController.text = (current + 10).toString();
+                                        });
+                                      },
+                                      tooltip: 'Rrit me 10',
+                                      color: const Color(0xFF10B981),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Category Settings
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Kategoritë dhe Nën-kategoritë',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF1E293B),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          RadioListTile<bool>(
+                            title: const Text('Përdor kategoritë default'),
+                            value: true,
+                            groupValue: _useDefaultCategories,
+                            onChanged: (value) {
+                              setState(() {
+                                _useDefaultCategories = value ?? true;
+                                if (_useDefaultCategories) {
+                                  _customCategories.clear();
+                                }
+                              });
+                            },
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          RadioListTile<bool>(
+                            title: const Text('Krijo kategoritë e reja për këtë biznes'),
+                            value: false,
+                            groupValue: _useDefaultCategories,
+                            onChanged: (value) {
+                              setState(() {
+                                _useDefaultCategories = value ?? false;
+                              });
+                            },
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          
+                          if (!_useDefaultCategories) ...[
+                            const SizedBox(height: 16),
+                            const Divider(),
+                            const SizedBox(height: 12),
+                            Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildTextField(
+                                        controller: _categoryNameController,
+                                        label: 'Emri i Kategorisë',
+                                        icon: Icons.category,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: _buildTextField(
+                                        controller: _subcategoryNameController,
+                                        label: 'Emri i Nën-kategorisë',
+                                        icon: Icons.label,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: DropdownButtonFormField<String>(
+                                        value: _selectedCategoryForSubcategory,
+                                        decoration: InputDecoration(
+                                          labelText: 'Kategoria (për nën-kategori)',
+                                          labelStyle: const TextStyle(
+                                            color: Colors.black87,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                        ),
+                                        items: _customCategories.keys.map((cat) {
+                                          return DropdownMenuItem(
+                                            value: cat,
+                                            child: Text(cat, overflow: TextOverflow.ellipsis),
+                                          );
+                                        }).toList(),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _selectedCategoryForSubcategory = value;
+                                          });
+                                        },
+                                        hint: const Text('Zgjedh kategori'),
+                                        isExpanded: true,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                FilledButton.icon(
+                                  onPressed: () {
+                                    final catName = _categoryNameController.text.trim();
+                                    if (catName.isEmpty) {
+                                      _showError('Shkruaj emrin e kategorisë!');
+                                      return;
+                                    }
+                                    setState(() {
+                                      if (!_customCategories.containsKey(catName)) {
+                                        _customCategories[catName] = [];
+                                        _customCategorySizes[catName] = [];
+                                      }
+                                      _categoryNameController.clear();
+                                    });
+                                  },
+                                  icon: const Icon(Icons.add, size: 18),
+                                  label: const Text('Shto Kategori'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF6366F1),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                FilledButton.icon(
+                                  onPressed: () {
+                                    final subName = _subcategoryNameController.text.trim();
+                                    if (subName.isEmpty) {
+                                      _showError('Shkruaj emrin e nën-kategorisë!');
+                                      return;
+                                    }
+                                    if (_selectedCategoryForSubcategory == null) {
+                                      _showError('Zgjedh kategorinë!');
+                                      return;
+                                    }
+                                    setState(() {
+                                      if (!_customCategories[_selectedCategoryForSubcategory]!.contains(subName)) {
+                                        _customCategories[_selectedCategoryForSubcategory]!.add(subName);
+                                      }
+                                      _subcategoryNameController.clear();
+                                    });
+                                  },
+                                  icon: const Icon(Icons.add, size: 18),
+                                  label: const Text('Shto Nën-kategori'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF10B981),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            const Divider(),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Numrat/Madhësitë për Kategori',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _sizeValueController,
+                                    label: 'Numri/Madhësia (p.sh. 17, 18, S, M, L)',
+                                    icon: Icons.numbers,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    value: _selectedCategoryForSize,
+                                    decoration: InputDecoration(
+                                      labelText: 'Kategoria',
+                                      labelStyle: const TextStyle(
+                                        color: Colors.black87,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    ),
+                                    items: _customCategories.keys.map((cat) {
+                                      return DropdownMenuItem(
+                                        value: cat,
+                                        child: Text(cat, overflow: TextOverflow.ellipsis),
+                                      );
+                                    }).toList(),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _selectedCategoryForSize = value;
+                                      });
+                                    },
+                                    hint: const Text('Zgjedh kategori'),
+                                    isExpanded: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton.icon(
+                              onPressed: () {
+                                final sizeValue = _sizeValueController.text.trim();
+                                if (sizeValue.isEmpty) {
+                                  _showError('Shkruaj numrin/madhësinë!');
+                                  return;
+                                }
+                                if (_selectedCategoryForSize == null) {
+                                  _showError('Zgjedh kategorinë!');
+                                  return;
+                                }
+                                setState(() {
+                                  if (!_customCategorySizes[_selectedCategoryForSize]!.contains(sizeValue)) {
+                                    _customCategorySizes[_selectedCategoryForSize]!.add(sizeValue);
+                                  }
+                                  _sizeValueController.clear();
+                                });
+                              },
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text('Shto Numër/Madhësi'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFFF59E0B),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              ),
+                            ),
+                            if (_customCategories.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              const Divider(),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Kategoritë e krijuara:',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ..._customCategories.entries.map((entry) {
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.grey.shade300),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            entry.key,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete, size: 18, color: Colors.red),
+                                            onPressed: () {
+                                              setState(() {
+                                                _customCategories.remove(entry.key);
+                                                if (_selectedCategoryForSubcategory == entry.key) {
+                                                  _selectedCategoryForSubcategory = null;
+                                                }
+                                              });
+                                            },
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                          ),
+                                        ],
+                                      ),
+                                      if (entry.value.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: entry.value.map((sub) {
+                                            return Chip(
+                                              label: Text(sub),
+                                              deleteIcon: const Icon(Icons.close, size: 16),
+                                              onDeleted: () {
+                                                setState(() {
+                                                  entry.value.remove(sub);
+                                                });
+                                              },
+                                              backgroundColor: Colors.blue.shade50,
+                                              labelStyle: const TextStyle(fontSize: 12),
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ],
+                                      if (_customCategorySizes.containsKey(entry.key) && _customCategorySizes[entry.key]!.isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'Numrat/Madhësitë:',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 12,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: _customCategorySizes[entry.key]!.map((size) {
+                                            return Chip(
+                                              label: Text(size),
+                                              deleteIcon: const Icon(Icons.close, size: 16),
+                                              onDeleted: () {
+                                                setState(() {
+                                                  _customCategorySizes[entry.key]!.remove(size);
+                                                });
+                                              },
+                                              backgroundColor: Colors.orange.shade50,
+                                              labelStyle: const TextStyle(fontSize: 12),
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
                     // Action buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -1024,6 +1492,9 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
                                 ),
                               ),
                               
+                              // Spacing between password and email
+                              const SizedBox(width: 12),
+                              
                               // Email
                               SizedBox(
                                 width: 120,
@@ -1114,9 +1585,11 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
     required TextEditingController controller,
     required String label,
     required IconData icon,
+    TextInputType? keyboardType,
   }) {
     return TextField(
       controller: controller,
+      keyboardType: keyboardType,
       style: const TextStyle(color: Color(0xFF1E293B)),
       decoration: InputDecoration(
         labelText: label,
@@ -1148,6 +1621,15 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
     _phoneController.clear();
     _taxIdController.clear();
     _businessPasswordController.clear();
+    _categoryNameController.clear();
+    _subcategoryNameController.clear();
+    _sizeValueController.clear();
+    _validDaysController.text = '365';
+    _useDefaultCategories = true;
+    _customCategories.clear();
+    _customCategorySizes.clear();
+    _selectedCategoryForSubcategory = null;
+    _selectedCategoryForSize = null;
   }
 
   // ✅ Build license status badge
@@ -1386,29 +1868,35 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
               try {
                 setState(() => _loading = true);
                 
-                // Generate license key
-                final licenseKey = await LicenseService.I.generateLicenseKey(
-                  'business-${business.id}',
-                  validDays: validDays,
-                );
-                
-                // Add to database
-                await LocalApi.I.addBusinessLicense(
+                // ✅ Vazhdo licencën ekzistuese ose shto një të re
+                await LocalApi.I.extendOrAddBusinessLicense(
                   businessId: business.id,
-                  licenseKey: licenseKey,
                   validDays: validDays,
                   notes: notesController.text.trim().isEmpty 
                       ? null 
                       : notesController.text.trim(),
                 );
                 
-                _showSuccess('Licensa u shtua me sukses!');
+                if (!mounted) return;
+                _showSuccess('Licensa u vazhdua me sukses! ✅');
                 Navigator.pop(ctx);
                 await _loadBusinesses();
               } catch (e) {
-                _showError('Gabim: $e');
+                if (!mounted) return;
+                final errorMsg = e.toString();
+                String userFriendlyMsg;
+                
+                if (errorMsg.contains('UNIQUE constraint')) {
+                  userFriendlyMsg = 'Licensa me këtë key ekziston tashmë. Licensa u vazhdua automatikisht.';
+                } else if (errorMsg.contains('constraint failed')) {
+                  userFriendlyMsg = 'Gabim në databazë. Kontrollo që të dhënat janë valide.';
+                } else {
+                  userFriendlyMsg = 'Gabim: ${errorMsg.length > 100 ? errorMsg.substring(0, 100) + "..." : errorMsg}';
+                }
+                
+                _showError(userFriendlyMsg);
               } finally {
-                setState(() => _loading = false);
+                if (mounted) setState(() => _loading = false);
               }
             },
             icon: const Icon(Icons.add),

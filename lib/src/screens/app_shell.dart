@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shoe_store_manager/auth/role_store.dart';
@@ -218,6 +219,46 @@ class _AppShellState extends State<AppShell> {
               ),
             ),
 
+            // Close button - Fixed at bottom
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: _closeApp,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                  child: Row(
+                    children: [
+                      SvgPicture.asset(
+                        'assets/icons/logout.svg',
+                        width: 20,
+                        height: 20,
+                        colorFilter: const ColorFilter.mode(
+                          Colors.red,
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Mbyll',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
             // Logout button - Fixed at bottom
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -263,6 +304,33 @@ class _AppShellState extends State<AppShell> {
     );
   }
 
+
+  // ================= CLOSE APP =================
+  Future<void> _closeApp() async {
+    final shouldClose = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Close App'),
+          content: const Text('Are you sure you want to close this app?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldClose ?? false) {
+      exit(0);
+    }
+  }
 
   // ================= LOGOUT =================
   Future<void> _logout() async {

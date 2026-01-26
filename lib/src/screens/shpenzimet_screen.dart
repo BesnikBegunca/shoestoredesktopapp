@@ -17,7 +17,8 @@ class ShpenzimetScreen extends StatefulWidget {
 
 class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
   String _selectedPeriod = 'today'; // 'today', 'week', 'month'
-  String _selectedCategory = 'all'; // 'all', 'Rryma', 'Uji', 'Qiraja', 'Blerje Malli', 'Të tjera'
+  String _selectedCategory =
+      'all'; // 'all', 'Rryma', 'Uji', 'Qiraja', 'Blerje Malli', 'Të tjera'
   bool _loading = true;
   bool _showAddForm = false;
   List<Map<String, dynamic>> _expenses = [];
@@ -61,8 +62,10 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
         period: _selectedPeriod,
         categoryFilter: _selectedCategory == 'all' ? null : _selectedCategory,
       );
-      final summary = await LocalApi.I.getExpensesSummary(period: _selectedPeriod);
-      
+      final summary = await LocalApi.I.getExpensesSummary(
+        period: _selectedPeriod,
+      );
+
       if (!mounted) return;
       setState(() {
         _expenses = expenses;
@@ -78,22 +81,16 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
 
   void _showError(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: Colors.red,
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
   void _showSuccess(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: Colors.green,
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
   }
 
   String _getPeriodLabel() {
@@ -114,13 +111,11 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
     return DateFormat('dd/MM/yyyy HH:mm').format(d);
   }
 
-  String _formatCurrency(double amount) {
-    return '€${amount.toStringAsFixed(2)}';
-  }
+  String _formatCurrency(double amount) => '€${amount.toStringAsFixed(2)}';
 
   Future<void> _addExpense() async {
     final amount = double.tryParse(_amountController.text.trim());
-    
+
     if (amount == null || amount <= 0) {
       _showError('Shëno një shumë valide');
       return;
@@ -130,19 +125,19 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
       await LocalApi.I.addExpense(
         category: _selectedCategoryForm,
         amount: amount,
-        note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
+        note: _noteController.text.trim().isEmpty
+            ? null
+            : _noteController.text.trim(),
       );
 
       if (!mounted) return;
-      
+
       _showSuccess('Shpenzimi u shtua me sukses');
-      
-      // Clear form
+
       _amountController.clear();
       _noteController.clear();
       setState(() => _showAddForm = false);
-      
-      // Reload data
+
       await _loadData();
     } catch (e) {
       _showError('Gabim: $e');
@@ -159,7 +154,6 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // Header
               pw.Text(
                 'Raporti i Shpenzimeve - ${_getPeriodLabel()}',
                 style: pw.TextStyle(
@@ -174,7 +168,6 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
               ),
               pw.SizedBox(height: 20),
 
-              // Summary
               pw.Container(
                 padding: const pw.EdgeInsets.all(16),
                 decoration: pw.BoxDecoration(
@@ -187,15 +180,23 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Shpenzime Operative:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        pw.Text(_formatCurrency(_summary['expensesTotal'] ?? 0)),
+                        pw.Text(
+                          'Shpenzime Operative:',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
+                        pw.Text(
+                          _formatCurrency(_summary['expensesTotal'] ?? 0),
+                        ),
                       ],
                     ),
                     pw.SizedBox(height: 8),
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Blerje Malli:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Text(
+                          'Blerje Malli:',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
                         pw.Text(_formatCurrency(_summary['investTotal'] ?? 0)),
                       ],
                     ),
@@ -203,8 +204,20 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Totali:', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                        pw.Text(_formatCurrency(_summary['grandTotal'] ?? 0), style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                        pw.Text(
+                          'Totali:',
+                          style: pw.TextStyle(
+                            fontSize: 16,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.Text(
+                          _formatCurrency(_summary['grandTotal'] ?? 0),
+                          style: pw.TextStyle(
+                            fontSize: 16,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -213,39 +226,53 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
 
               pw.SizedBox(height: 20),
 
-              // Expenses Table
               pw.Text(
                 'Lista e Shpenzimeve (${(_summary['totalCount'] ?? 0).toInt()} total)',
-                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
               pw.SizedBox(height: 10),
 
               pw.Table(
                 border: pw.TableBorder.all(),
                 children: [
-                  // Header
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.grey300,
+                    ),
                     children: [
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text('Kategoria', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        child: pw.Text(
+                          'Kategoria',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text('Data', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        child: pw.Text(
+                          'Data',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text('Shuma', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        child: pw.Text(
+                          'Shuma',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text('Shënim', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        child: pw.Text(
+                          'Shënim',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),
-                  // Data rows
                   ..._expenses.map((expense) {
                     return pw.TableRow(
                       children: [
@@ -255,11 +282,15 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                         ),
                         pw.Padding(
                           padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(_formatDate(expense['createdAtMs'] ?? 0)),
+                          child: pw.Text(
+                            _formatDate(expense['createdAtMs'] ?? 0),
+                          ),
                         ),
                         pw.Padding(
                           padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(_formatCurrency(expense['amount'] ?? 0)),
+                          child: pw.Text(
+                            _formatCurrency(expense['amount'] ?? 0),
+                          ),
                         ),
                         pw.Padding(
                           padding: const pw.EdgeInsets.all(8),
@@ -276,9 +307,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
-    );
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 
   @override
@@ -289,9 +318,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
         children: [
           // Header
           Container(
-            decoration: const BoxDecoration(
-              color: AppTheme.bgPage,
-            ),
+            decoration: const BoxDecoration(color: AppTheme.bgPage),
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -311,8 +338,8 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
+                        children: const [
+                          Text(
                             'Shpenzimet',
                             style: TextStyle(
                               fontSize: 28,
@@ -323,13 +350,22 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                         ],
                       ),
                     ),
+
+                    // ✅ ICON BUTTON: add/close -> SVG
                     IconButton(
                       onPressed: () {
                         setState(() => _showAddForm = !_showAddForm);
                       },
-                      icon: Icon(
-                        _showAddForm ? Icons.close : Icons.add_circle,
-                        color: Colors.blue.shade700,
+                      icon: SvgPicture.asset(
+                        _showAddForm
+                            ? 'assets/icons/close.svg'
+                            : 'assets/icons/add.svg',
+                        width: 22,
+                        height: 22,
+                        colorFilter: ColorFilter.mode(
+                          Colors.blue.shade700,
+                          BlendMode.srcIn,
+                        ),
                       ),
                       tooltip: _showAddForm ? 'Mbyll' : 'Shto Shpenzim',
                       style: IconButton.styleFrom(
@@ -338,9 +374,15 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
+
+                    // ✅ ICON BUTTON: print -> SVG
                     IconButton(
                       onPressed: _printReport,
-                      icon: Icon(Icons.print, color: Colors.red.shade700),
+                      icon: SvgPicture.asset(
+                        'assets/icons/print.svg',
+                        width: 22,
+                        height: 22,
+                      ),
                       tooltip: 'Printo Raportin',
                       style: IconButton.styleFrom(
                         backgroundColor: Colors.red.withOpacity(0.1),
@@ -350,7 +392,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Period filters
                 Row(
                   children: [
@@ -387,7 +429,16 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.add_circle_outline, color: Colors.blue.shade700, size: 24),
+                      // ✅ add icon -> SVG
+                      SvgPicture.asset(
+                        'assets/icons/add_circle_outline.svg',
+                        width: 24,
+                        height: 24,
+                        colorFilter: ColorFilter.mode(
+                          Colors.blue.shade700,
+                          BlendMode.srcIn,
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       const Text(
                         'Shto Shpenzim të Ri',
@@ -400,7 +451,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  
+
                   Row(
                     children: [
                       // Category Dropdown
@@ -419,7 +470,10 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                             ),
                             const SizedBox(height: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 border: Border.all(color: AppTheme.stroke),
                                 borderRadius: BorderRadius.circular(12),
@@ -436,7 +490,9 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                   }).toList(),
                                   onChanged: (value) {
                                     if (value != null) {
-                                      setState(() => _selectedCategoryForm = value);
+                                      setState(
+                                        () => _selectedCategoryForm = value,
+                                      );
                                     }
                                   },
                                 ),
@@ -446,7 +502,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      
+
                       // Amount
                       Expanded(
                         flex: 2,
@@ -470,14 +526,26 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                prefixIcon: const Icon(Icons.euro),
+                                // ✅ euro icon -> SVG
+                                prefixIcon: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: SvgPicture.asset(
+                                    'assets/icons/euro.svg',
+                                    width: 20,
+                                    height: 20,
+                                    colorFilter: const ColorFilter.mode(
+                                      AppTheme.muted,
+                                      BlendMode.srcIn,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(width: 16),
-                      
+
                       // Note
                       Expanded(
                         flex: 3,
@@ -500,23 +568,47 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                prefixIcon: const Icon(Icons.note),
+                                // ✅ note icon -> SVG
+                                prefixIcon: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: SvgPicture.asset(
+                                    'assets/icons/note.svg',
+                                    width: 20,
+                                    height: 20,
+                                    colorFilter: const ColorFilter.mode(
+                                      AppTheme.muted,
+                                      BlendMode.srcIn,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
                       const SizedBox(width: 16),
-                      
+
                       // Add Button
                       Padding(
                         padding: const EdgeInsets.only(top: 28),
                         child: FilledButton.icon(
                           onPressed: _addExpense,
-                          icon: const Icon(Icons.check),
+                          // (te FilledButton.icon s’ka qare: do Widget, po edhe Icon punon; po e bëjmë SVG)
+                          icon: SvgPicture.asset(
+                            'assets/icons/check.svg',
+                            width: 18,
+                            height: 18,
+                            colorFilter: const ColorFilter.mode(
+                              Colors.white,
+                              BlendMode.srcIn,
+                            ),
+                          ),
                           label: const Text('Shto'),
                           style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 16,
+                            ),
                             backgroundColor: Colors.blue.shade700,
                           ),
                         ),
@@ -542,30 +634,63 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                             Expanded(
                               child: _summaryCard(
                                 title: 'Shpenzime Operative',
-                                value: _formatCurrency(_summary['expensesTotal'] ?? 0),
-                                icon: Icons.receipt_long,
+                                value: _formatCurrency(
+                                  _summary['expensesTotal'] ?? 0,
+                                ),
+                                icon: SvgPicture.asset(
+                                  'assets/icons/expenses.svg',
+                                  width: 24,
+                                  height: 24,
+                                  colorFilter: const ColorFilter.mode(
+                                    Colors.orange,
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
                                 color: Colors.orange,
-                                subtitle: '${(_summary['expensesCount'] ?? 0).toInt()} shpenzime',
+                                subtitle:
+                                    '${(_summary['expensesCount'] ?? 0).toInt()} shpenzime',
                               ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: _summaryCard(
                                 title: 'Blerje Malli',
-                                value: _formatCurrency(_summary['investTotal'] ?? 0),
-                                icon: Icons.shopping_cart,
+                                value: _formatCurrency(
+                                  _summary['investTotal'] ?? 0,
+                                ),
+                                icon: SvgPicture.asset(
+                                  'assets/icons/cart.svg',
+                                  width: 24,
+                                  height: 24,
+                                  colorFilter: const ColorFilter.mode(
+                                    Colors.purple,
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
                                 color: Colors.purple,
-                                subtitle: '${(_summary['investCount'] ?? 0).toInt()} investime',
+                                subtitle:
+                                    '${(_summary['investCount'] ?? 0).toInt()} investime',
                               ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: _summaryCard(
                                 title: 'Totali i Shpenzimeve',
-                                value: _formatCurrency(_summary['grandTotal'] ?? 0),
-                                icon: Icons.account_balance_wallet,
+                                value: _formatCurrency(
+                                  _summary['grandTotal'] ?? 0,
+                                ),
+                                icon: SvgPicture.asset(
+                                  'assets/icons/wallet.svg',
+                                  width: 24,
+                                  height: 24,
+                                  colorFilter: ColorFilter.mode(
+                                    Colors.red.shade700,
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
                                 color: Colors.red.shade700,
-                                subtitle: '${(_summary['totalCount'] ?? 0).toInt()} total',
+                                subtitle:
+                                    '${(_summary['totalCount'] ?? 0).toInt()} total',
                               ),
                             ),
                           ],
@@ -579,7 +704,16 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.filter_list, size: 24, color: AppTheme.text),
+                                // ✅ filter icon -> SVG
+                                SvgPicture.asset(
+                                  'assets/icons/filter.svg',
+                                  width: 24,
+                                  height: 24,
+                                  colorFilter: const ColorFilter.mode(
+                                    AppTheme.text,
+                                    BlendMode.srcIn,
+                                  ),
+                                ),
                                 const SizedBox(width: 8),
                                 const Text(
                                   'Filtro sipas kategorisë:',
@@ -598,10 +732,16 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                 children: [
                                   _categoryChip('Të gjitha', 'all'),
                                   const SizedBox(width: 8),
-                                  ..._categories.map((cat) => Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: _categoryChip(cat, cat),
-                                  )).toList(),
+                                  ..._categories
+                                      .map(
+                                        (cat) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            right: 8,
+                                          ),
+                                          child: _categoryChip(cat, cat),
+                                        ),
+                                      )
+                                      .toList(),
                                 ],
                               ),
                             ),
@@ -610,10 +750,19 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
 
                         const SizedBox(height: 24),
 
-                        // Expenses Table
+                        // Expenses Table title
                         Row(
                           children: [
-                            const Icon(Icons.list_alt, size: 24, color: AppTheme.text),
+                            // ✅ list icon -> SVG
+                            SvgPicture.asset(
+                              'assets/icons/list.svg',
+                              width: 24,
+                              height: 24,
+                              colorFilter: const ColorFilter.mode(
+                                AppTheme.text,
+                                BlendMode.srcIn,
+                              ),
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               'Lista e Shpenzimeve - ${_getPeriodLabel()}',
@@ -639,10 +788,11 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                             child: Center(
                               child: Column(
                                 children: [
-                                  Icon(
-                                    Icons.inbox_outlined,
-                                    size: 64,
-                                    color: AppTheme.muted.withOpacity(0.5),
+                                  // ✅ inbox icon -> SVG
+                                  SvgPicture.asset(
+                                    'assets/icons/emptybox.svg',
+                                    width: 64,
+                                    height: 64,
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
@@ -676,30 +826,30 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                 // Table Header
                                 Container(
                                   padding: const EdgeInsets.all(20),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF2C3E50),
-                                    borderRadius: const BorderRadius.only(
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF2C3E50),
+                                    borderRadius: BorderRadius.only(
                                       topLeft: Radius.circular(16),
                                       topRight: Radius.circular(16),
                                     ),
                                   ),
                                   child: Row(
-                                    children: [
+                                    children: const [
                                       Expanded(
                                         flex: 2,
-                                        child: _tableHeader('Kategoria'),
+                                        child: _Header('Kategoria'),
                                       ),
                                       Expanded(
                                         flex: 3,
-                                        child: _tableHeader('Data & Ora'),
+                                        child: _Header('Data & Ora'),
                                       ),
                                       Expanded(
                                         flex: 2,
-                                        child: _tableHeader('Shuma'),
+                                        child: _Header('Shuma'),
                                       ),
                                       Expanded(
                                         flex: 3,
-                                        child: _tableHeader('Shënim'),
+                                        child: _Header('Shënim'),
                                       ),
                                     ],
                                   ),
@@ -710,7 +860,8 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
                                   itemCount: _expenses.length,
-                                  separatorBuilder: (_, __) => const Divider(height: 1),
+                                  separatorBuilder: (_, __) =>
+                                      const Divider(height: 1),
                                   itemBuilder: (_, i) {
                                     final expense = _expenses[i];
 
@@ -723,20 +874,29 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                             child: Row(
                                               children: [
                                                 Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 6,
-                                                  ),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 6,
+                                                      ),
                                                   decoration: BoxDecoration(
-                                                    color: _getCategoryColor(expense['category']).withOpacity(0.1),
-                                                    borderRadius: BorderRadius.circular(8),
+                                                    color: _getCategoryColor(
+                                                      expense['category'],
+                                                    ).withOpacity(0.1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
                                                   ),
                                                   child: Text(
                                                     expense['category'] ?? '',
                                                     style: TextStyle(
-                                                      fontWeight: FontWeight.w800,
+                                                      fontWeight:
+                                                          FontWeight.w800,
                                                       fontSize: 13,
-                                                      color: _getCategoryColor(expense['category']),
+                                                      color: _getCategoryColor(
+                                                        expense['category'],
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
@@ -746,7 +906,9 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                           Expanded(
                                             flex: 3,
                                             child: Text(
-                                              _formatDate(expense['createdAtMs'] ?? 0),
+                                              _formatDate(
+                                                expense['createdAtMs'] ?? 0,
+                                              ),
                                               style: TextStyle(
                                                 color: AppTheme.muted,
                                                 fontWeight: FontWeight.w600,
@@ -757,7 +919,9 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                           Expanded(
                                             flex: 2,
                                             child: Text(
-                                              _formatCurrency(expense['amount'] ?? 0),
+                                              _formatCurrency(
+                                                expense['amount'] ?? 0,
+                                              ),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w900,
                                                 fontSize: 15,
@@ -818,7 +982,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
 
   Widget _periodButton(String label, String period) {
     final isSelected = _selectedPeriod == period;
-    
+
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -831,14 +995,10 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: isSelected 
-                  ? Colors.red.shade700
-                  : Colors.white,
+              color: isSelected ? Colors.red.shade700 : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isSelected 
-                    ? Colors.red.shade700
-                    : AppTheme.stroke,
+                color: isSelected ? Colors.red.shade700 : AppTheme.stroke,
                 width: 2,
               ),
             ),
@@ -859,11 +1019,11 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
 
   Widget _categoryChip(String label, String value) {
     final isSelected = _selectedCategory == value;
-    
+
     return FilterChip(
       label: Text(label),
       selected: isSelected,
-      onSelected: (selected) {
+      onSelected: (_) {
         setState(() => _selectedCategory = value);
         _loadData();
       },
@@ -877,10 +1037,11 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
     );
   }
 
+  // ✅ NDRYSHIM KRYESOR: IconData -> Widget (SVG ose Icon)
   Widget _summaryCard({
     required String title,
     required String value,
-    required IconData icon,
+    required Widget icon,
     required Color color,
     required String subtitle,
   }) {
@@ -909,7 +1070,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                   color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: SizedBox(width: 24, height: 24, child: icon),
               ),
               const Spacer(),
             ],
@@ -945,8 +1106,15 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
       ),
     );
   }
+}
 
-  Widget _tableHeader(String text) {
+// ✅ helper i vogel per header (se e kishe si funksion; e mbajta pa e ndryshu logjiken)
+class _Header extends StatelessWidget {
+  final String text;
+  const _Header(this.text);
+
+  @override
+  Widget build(BuildContext context) {
     return Text(
       text,
       style: const TextStyle(

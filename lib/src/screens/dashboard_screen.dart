@@ -31,15 +31,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _loading = true);
     try {
       final monthOptions = await LocalApi.I.getMonthOptions();
-      final currentMonth = monthOptions.isNotEmpty ? monthOptions.first : _monthKey(DateTime.now());
-      
+      final currentMonth = monthOptions.isNotEmpty
+          ? monthOptions.first
+          : _monthKey(DateTime.now());
+
       final stats = await LocalApi.I.getAdminStats(selectedMonth: currentMonth);
       final salesData = await LocalApi.I.getDailySalesData(days: 7);
       final recent = await LocalApi.I.getRecentSales(limit: 5);
       final products = await LocalApi.I.getProducts();
-      
+
       final lowStock = products.where((p) => p.stockQty < 5).length;
-      
+
       if (!mounted) return;
       setState(() {
         _stats = stats;
@@ -58,9 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _monthKey(DateTime d) =>
       '${d.year}-${(d.month).toString().padLeft(2, '0')}';
 
-  String _formatCurrency(double amount) {
-    return '€${amount.toStringAsFixed(2)}';
-  }
+  String _formatCurrency(double amount) => '€${amount.toStringAsFixed(2)}';
 
   String _formatDate(int ms) {
     final d = DateTime.fromMillisecondsSinceEpoch(ms);
@@ -73,11 +73,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       color: AppTheme.bg,
       child: Column(
         children: [
-          // Simple Header
+          // Header
           Container(
-            decoration: const BoxDecoration(
-              color: AppTheme.bgPage,
-            ),
+            decoration: const BoxDecoration(color: AppTheme.bgPage),
             padding: const EdgeInsets.all(24),
             child: Row(
               children: [
@@ -109,7 +107,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
 
-          // Main Content
+          // Content
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -118,16 +116,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Stats Cards
                         if (_stats != null) _buildStatsCards(_stats!),
-                        
                         const SizedBox(height: 24),
-                        
-                        // Charts and Tables Row
+
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Left Column - Charts
+                            // Left
                             Expanded(
                               flex: 2,
                               child: Column(
@@ -138,10 +133,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ],
                               ),
                             ),
-                            
+
                             const SizedBox(width: 24),
-                            
-                            // Right Column - Quick Info
+
+                            // Right
                             Expanded(
                               flex: 1,
                               child: Column(
@@ -171,7 +166,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: 'Shitje Sot',
             value: _formatCurrency(stats.totalSalesToday),
             subtitle: '${stats.countSalesToday} transaksione',
-            icon: Icons.shopping_cart,
+            icon: SvgPicture.asset(
+              'assets/icons/cart.svg',
+              width: 24,
+              height: 24,
+              colorFilter: const ColorFilter.mode(Colors.blue, BlendMode.srcIn),
+            ),
             color: Colors.blue,
             trend: stats.totalSalesToday > 0 ? '+' : '',
           ),
@@ -182,7 +182,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: 'Fitimi Sot',
             value: _formatCurrency(stats.totalProfitToday),
             subtitle: 'Profit i ditës',
-            icon: Icons.trending_up,
+            icon: SvgPicture.asset(
+              'assets/icons/fitimi.svg',
+              width: 24,
+              height: 24,
+              colorFilter: const ColorFilter.mode(Colors.blue, BlendMode.srcIn),
+            ),
             color: Colors.green,
             trend: stats.totalProfitToday > 0 ? '+' : '',
           ),
@@ -193,7 +198,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: 'Shitje Muaji',
             value: _formatCurrency(stats.totalSalesMonth),
             subtitle: '${stats.countSalesMonth} transaksione',
-            icon: Icons.calendar_month,
+            icon: SvgPicture.asset(
+              'assets/icons/calendar.svg',
+              width: 24,
+              height: 24,
+              colorFilter: const ColorFilter.mode(Colors.blue, BlendMode.srcIn),
+            ),
             color: Colors.purple,
             trend: '',
           ),
@@ -204,7 +214,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: 'Totali',
             value: _formatCurrency(stats.totalSalesAll),
             subtitle: '${stats.countSalesAll} total',
-            icon: Icons.account_balance_wallet,
+            icon: SvgPicture.asset(
+              'assets/icons/wallet.svg',
+              width: 24,
+              height: 24,
+              colorFilter: const ColorFilter.mode(
+                Colors.orange,
+                BlendMode.srcIn,
+              ),
+            ),
             color: Colors.orange,
             trend: '',
           ),
@@ -217,7 +235,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required String title,
     required String value,
     required String subtitle,
-    required IconData icon,
+    required Widget icon, // ✅ Widget, jo IconData
     required Color color,
     required String trend,
   }) {
@@ -246,12 +264,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: SizedBox(width: 24, height: 24, child: icon), // ✅
               ),
               const Spacer(),
               if (trend.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -270,7 +291,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 16),
           Text(
             title,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppTheme.muted,
               fontWeight: FontWeight.w700,
               fontSize: 13,
@@ -288,7 +309,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppTheme.muted,
               fontWeight: FontWeight.w600,
               fontSize: 11,
@@ -322,7 +343,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.blue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -339,11 +363,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          
           SizedBox(
             height: 250,
             child: _dailySalesData.isEmpty
-                ? Center(
+                ? const Center(
                     child: Text(
                       'S\'ka të dhëna',
                       style: TextStyle(color: AppTheme.muted),
@@ -357,10 +380,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         enabled: true,
                         touchTooltipData: BarTouchTooltipData(
                           getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                            final date = _dailySalesData[groupIndex]['dayKey'] ?? '';
-                            final total = _dailySalesData[groupIndex]['total'] ?? 0.0;
+                            final date =
+                                _dailySalesData[groupIndex]['dayKey'] ?? '';
+                            final total =
+                                _dailySalesData[groupIndex]['total'] ?? 0.0;
                             return BarTooltipItem(
-                              '$date\n${_formatCurrency(total)}',
+                              '$date\n${_formatCurrency((total as num).toDouble())}',
                               const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -371,22 +396,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       titlesData: FlTitlesData(
                         show: true,
-                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                         bottomTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
                             getTitlesWidget: (value, meta) {
                               final index = value.toInt();
-                              if (index >= 0 && index < _dailySalesData.length) {
-                                final dayKey = _dailySalesData[index]['dayKey'] ?? '';
+                              if (index >= 0 &&
+                                  index < _dailySalesData.length) {
+                                final dayKey =
+                                    _dailySalesData[index]['dayKey'] ?? '';
                                 final parts = dayKey.split('-');
                                 if (parts.length >= 3) {
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 8),
                                     child: Text(
                                       '${parts[2]}/${parts[1]}',
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         color: AppTheme.muted,
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
@@ -406,7 +437,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             getTitlesWidget: (value, meta) {
                               return Text(
                                 '€${value.toInt()}',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: AppTheme.muted,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -419,32 +450,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       gridData: FlGridData(
                         show: true,
                         drawVerticalLine: false,
-                        getDrawingHorizontalLine: (value) => FlLine(
-                          color: AppTheme.stroke,
-                          strokeWidth: 1,
-                        ),
+                        getDrawingHorizontalLine: (value) =>
+                            FlLine(color: AppTheme.stroke, strokeWidth: 1),
                       ),
                       borderData: FlBorderData(show: false),
-                      barGroups: List.generate(
-                        _dailySalesData.length,
-                        (index) {
-                          final total = (_dailySalesData[index]['total'] as num?)?.toDouble() ?? 0.0;
-                          return BarChartGroupData(
-                            x: index,
-                            barRods: [
-                              BarChartRodData(
-                                toY: total,
-                                color: Colors.blue.shade700,
-                                width: 16,
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(6),
-                                  topRight: Radius.circular(6),
-                                ),
+                      barGroups: List.generate(_dailySalesData.length, (index) {
+                        final total =
+                            (_dailySalesData[index]['total'] as num?)
+                                ?.toDouble() ??
+                            0.0;
+                        return BarChartGroupData(
+                          x: index,
+                          barRods: [
+                            BarChartRodData(
+                              toY: total,
+                              color: Colors.blue.shade700,
+                              width: 16,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(6),
+                                topRight: Radius.circular(6),
                               ),
-                            ],
-                          );
-                        },
-                      ),
+                            ),
+                          ],
+                        );
+                      }),
                     ),
                   ),
           ),
@@ -455,7 +484,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   double _getMaxY() {
     if (_dailySalesData.isEmpty) return 1000;
-    final maxValue = _dailySalesData.map((d) => (d['total'] as num?)?.toDouble() ?? 0.0).reduce((a, b) => a > b ? a : b);
+    final maxValue = _dailySalesData
+        .map((d) => (d['total'] as num?)?.toDouble() ?? 0.0)
+        .reduce((a, b) => a > b ? a : b);
     return (maxValue * 1.2).ceilToDouble();
   }
 
@@ -479,11 +510,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          
           if (_stats != null) ...[
-            _financialRow('Shitje Totale', _stats!.totalSalesMonth, Colors.blue),
+            _financialRow(
+              'Shitje Totale',
+              _stats!.totalSalesMonth,
+              Colors.blue,
+            ),
             const SizedBox(height: 12),
-            _financialRow('Fitimi Bruto', _stats!.totalProfitMonth, Colors.green),
+            _financialRow(
+              'Fitimi Bruto',
+              _stats!.totalProfitMonth,
+              Colors.green,
+            ),
             const SizedBox(height: 12),
             _financialRow('Shpenzime', _stats!.totalExpensesMonth, Colors.red),
             const Divider(height: 32),
@@ -499,7 +537,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _financialRow(String label, double amount, Color color, {bool isLarge = false}) {
+  Widget _financialRow(
+    String label,
+    double amount,
+    Color color, {
+    bool isLarge = false,
+  }) {
     return Row(
       children: [
         Container(
@@ -553,25 +596,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          
+
+          // ✅ KREJT KTU U NDRYSHU: icon -> Widget (SVG ose Icon)
           _quickStatRow(
             'Produkte Totale',
             _productCount.toString(),
-            Icons.inventory_2,
+            SvgPicture.asset(
+              'assets/icons/inv.svg', // << vendose svg tend
+              width: 20,
+              height: 20,
+              colorFilter: const ColorFilter.mode(Colors.blue, BlendMode.srcIn),
+            ),
             Colors.blue,
           ),
           const Divider(height: 24),
           _quickStatRow(
             'Stok i Ulët',
             _lowStockCount.toString(),
-            Icons.warning_amber,
+            SvgPicture.asset(
+              'assets/icons/warningbox.svg', // << vendose svg tend
+              width: 20,
+              height: 20,
+              colorFilter: const ColorFilter.mode(
+                Colors.orange,
+                BlendMode.srcIn,
+              ),
+            ),
             Colors.orange,
           ),
           const Divider(height: 24),
           _quickStatRow(
             'Shitje Sot',
             _stats?.countSalesToday.toString() ?? '0',
-            Icons.shopping_bag,
+            SvgPicture.asset(
+              'assets/icons/soldtoday.svg', // << vendose svg tend
+              width: 20,
+              height: 20,
+              colorFilter: const ColorFilter.mode(
+                Colors.green,
+                BlendMode.srcIn,
+              ),
+            ),
             Colors.green,
           ),
         ],
@@ -579,7 +644,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _quickStatRow(String label, String value, IconData icon, Color color) {
+  // ✅ NDRYSHIMI KRYESOR: IconData -> Widget
+  Widget _quickStatRow(String label, String value, Widget icon, Color color) {
     return Row(
       children: [
         Container(
@@ -588,13 +654,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: color, size: 20),
+          child: SizedBox(width: 20, height: 20, child: icon), // ✅
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppTheme.muted,
               fontWeight: FontWeight.w400,
               fontSize: 13,
@@ -633,11 +699,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
           if (_recentSales.isEmpty)
-            Center(
+            const Center(
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(20),
                 child: Text(
                   'S\'ka shitje ende',
                   style: TextStyle(color: AppTheme.muted),
@@ -661,10 +726,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         color: Colors.blue.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(
-                        Icons.receipt_long,
-                        color: Colors.blue.shade700,
-                        size: 20,
+                      child: Center(
+                        child: SvgPicture.asset(
+                          'assets/icons/expenses.svg', // <-- qetu emri i svg tend
+                          width: 20,
+                          height: 20,
+                          colorFilter: ColorFilter.mode(
+                            Colors.blue.shade700,
+                            BlendMode.srcIn,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -682,7 +753,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           const SizedBox(height: 2),
                           Text(
                             _formatDate(sale['createdAtMs'] ?? 0),
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: AppTheme.muted,
                               fontSize: 11,
                               fontWeight: FontWeight.w600,

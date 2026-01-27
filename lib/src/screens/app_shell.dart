@@ -24,7 +24,6 @@ enum _NavSection {
   fitimet, 
   shpenzimet, 
   licenca, 
-  developer, 
   help 
 }
 
@@ -101,9 +100,6 @@ class _AppShellState extends State<AppShell> {
         break;
       case _NavSection.licenca:
         currentPage = const LicenseInfoScreen();
-        break;
-      case _NavSection.developer:
-        currentPage = const DeveloperScreen();
         break;
       case _NavSection.help:
         currentPage = const HelpScreen();
@@ -203,11 +199,6 @@ class _AppShellState extends State<AppShell> {
                       svgPath: 'assets/icons/licenca.svg',
                       label: 'Licenca',
                       section: _NavSection.licenca,
-                    ),
-                    _navItemSvg(
-                      svgPath: 'assets/icons/developer.svg',
-                      label: 'Developer',
-                      section: _NavSection.developer,
                     ),
                     _navItemSvg(
                       svgPath: 'assets/icons/info.svg',

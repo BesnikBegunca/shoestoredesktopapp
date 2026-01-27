@@ -1,6 +1,8 @@
 // daily_sale_screen.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shoe_store_manager/auth/role_store.dart';
 import 'package:shoe_store_manager/printing/receipt_builder.dart';
@@ -50,18 +52,135 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
   final barcodeController = TextEditingController();
   final amountController = TextEditingController();
   final amountFocus = FocusNode();
+  final barcodeFocus = FocusNode(); // Focus node për barcode TextField
   final scrollController = ScrollController();
+  final pageFocusNode = FocusNode(); // Focus node për page-level keyboard capture
   List<CartItem> cart = [];
   bool processing = false;
   bool checkingOut = false;
 
+  // Barcode scanning buffer dhe timer
+  String _barcodeBuffer = '';
+  Timer? _barcodeTimer;
+  static const Duration _barcodeTimeout = Duration(milliseconds: 250);
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-focus page-level node kur faqja hapet
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        pageFocusNode.requestFocus();
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _barcodeTimer?.cancel();
     barcodeController.dispose();
     amountController.dispose();
     amountFocus.dispose();
+    barcodeFocus.dispose();
+    pageFocusNode.dispose();
     scrollController.dispose();
     super.dispose();
+  }
+
+  // ✅ NEW: Handle keyboard events për barcode scanning
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    // Ignoro nëse është në procesim ose checkout
+    if (processing || checkingOut) {
+      return KeyEventResult.ignored;
+    }
+
+    // ✅ Ignoro TË GJITHA keyboard events nëse TextField i barcode është i fokusuar
+    // Kjo lejon TextField të trajtojë normalisht shkrimin manual, paste, backspace, etj.
+    // ENTER/TAB do të trajtohen nga TextField's onSubmitted callback
+    if (barcodeFocus.hasFocus) {
+      return KeyEventResult.ignored; // Lejo TextField të trajtojë të gjitha events
+    }
+
+    // Ignoro nëse amount field është i fokusuar
+    if (amountFocus.hasFocus) {
+      return KeyEventResult.ignored;
+    }
+
+    // Ignoro modifier keys
+    if (event.logicalKey == LogicalKeyboardKey.shiftLeft ||
+        event.logicalKey == LogicalKeyboardKey.shiftRight ||
+        event.logicalKey == LogicalKeyboardKey.controlLeft ||
+        event.logicalKey == LogicalKeyboardKey.controlRight ||
+        event.logicalKey == LogicalKeyboardKey.altLeft ||
+        event.logicalKey == LogicalKeyboardKey.altRight ||
+        event.logicalKey == LogicalKeyboardKey.metaLeft ||
+        event.logicalKey == LogicalKeyboardKey.metaRight) {
+      return KeyEventResult.ignored;
+    }
+
+    if (event is KeyDownEvent) {
+      // Handle ENTER ose TAB - proceso barcode
+      if (event.logicalKey == LogicalKeyboardKey.enter ||
+          event.logicalKey == LogicalKeyboardKey.tab) {
+        if (_barcodeBuffer.isNotEmpty) {
+          final barcode = _barcodeBuffer.trim();
+          _barcodeBuffer = '';
+          _barcodeTimer?.cancel();
+          _barcodeTimer = null;
+          if (barcode.isNotEmpty) {
+            _handleBarcodeScan(barcode);
+          }
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      }
+
+      // Handle backspace
+      if (event.logicalKey == LogicalKeyboardKey.backspace) {
+        if (_barcodeBuffer.isNotEmpty) {
+          _barcodeBuffer = _barcodeBuffer.substring(0, _barcodeBuffer.length - 1);
+          _resetBarcodeTimer();
+        }
+        return KeyEventResult.handled;
+      }
+
+      // Kap karakteret e printueshme
+      final character = event.character;
+      if (character != null && character.isNotEmpty && character.length == 1) {
+        // Ignoro karakteret speciale që nuk janë alfanumerike ose simbol bazë
+        if (RegExp(r'^[a-zA-Z0-9\-_\.\s]$').hasMatch(character)) {
+          _barcodeBuffer += character;
+          _resetBarcodeTimer();
+          return KeyEventResult.handled;
+        }
+      }
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  // ✅ NEW: Reset timer për barcode buffer
+  void _resetBarcodeTimer() {
+    _barcodeTimer?.cancel();
+    _barcodeTimer = Timer(_barcodeTimeout, () {
+      // Nëse ka kaluar timeout dhe buffer është bosh ose shumë i shkurtër,
+      // reset buffer (mund të jetë typing normal ose gabim)
+      // Por nëse buffer ka karaktere, mbaje derisa të vijë ENTER/TAB
+      // (barcode scanners zakonisht dërgojnë karaktere shumë shpejt)
+      if (_barcodeBuffer.length < 2) {
+        // Nëse buffer është shumë i shkurtër pas timeout, reset
+        _barcodeBuffer = '';
+      }
+    });
+  }
+
+  // ✅ NEW: Restore focus pas procesimit të barcode
+  void _restorePageFocus() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted && !processing && !checkingOut) {
+        pageFocusNode.requestFocus();
+      }
+    });
   }
 
   Future<void> _handleBarcodeScan(String barcode) async {
@@ -236,14 +355,14 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
         }
       }
 
-      // Pastro barcode field dhe fokusohu përsëri
+      // ✅ Pastro barcode field dhe restore page focus
+      // Sigurohu që TextField është i pastër dhe i unfocusuar
       barcodeController.clear();
-      FocusScope.of(context).requestFocus(FocusNode());
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (mounted) {
-          FocusScope.of(context).requestFocus(FocusNode());
-        }
-      });
+      barcodeFocus.unfocus();
+      _barcodeBuffer = '';
+      _barcodeTimer?.cancel();
+      _barcodeTimer = null;
+      _restorePageFocus();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -684,6 +803,9 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
       setState(() => cart.clear());
       barcodeController.clear();
       amountController.clear();
+      _barcodeBuffer = '';
+      _barcodeTimer?.cancel();
+      _barcodeTimer = null;
 
       if (!mounted) return;
 
@@ -765,25 +887,9 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      // Print Button
+                      // Print Button - DISABLED
                       OutlinedButton.icon(
-                        onPressed: () async {
-                          final businessName = await LocalApi.I
-                              .getCurrentBusinessName();
-                          final lines = buildReceiptLinesForCart(
-                            invoiceNo: res.invoiceNo,
-                            date: DateTime.now(),
-                            cartItems: cartItemsForReceipt,
-                          );
-
-                          await ReceiptPdf80mm.printOrSave(
-                            title: businessName,
-                            lines: lines,
-                            jobName: res.invoiceNo,
-                          );
-
-                          if (dCtx.mounted) Navigator.pop(dCtx);
-                        },
+                        onPressed: null, // ✅ DISABLED: Print button është çaktivizuar
                         icon: const Icon(Icons.print, size: 18),
                         label: const Text(
                           'Print',
@@ -812,6 +918,7 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                       ElevatedButton(
                         onPressed: () {
                           Navigator.pop(dCtx);
+                          _restorePageFocus();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black87,
@@ -847,7 +954,10 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text('Gabim gjatë checkout: $e')));
     } finally {
-      if (mounted) setState(() => checkingOut = false);
+      if (mounted) {
+        setState(() => checkingOut = false);
+        _restorePageFocus();
+      }
     }
   }
 
@@ -881,9 +991,13 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
   Widget build(BuildContext context) {
     final total = cart.fold<double>(0, (sum, item) => sum + item.lineTotal);
 
-    return Scaffold(
-      backgroundColor: AppTheme.bg,
-      body: Column(
+    return Focus(
+      focusNode: pageFocusNode,
+      onKeyEvent: _handleKeyEvent,
+      autofocus: true,
+      child: Scaffold(
+        backgroundColor: AppTheme.bg,
+        body: Column(
         children: [
           // Header - Single Row: Titull majtas, Barcode actions djathtas
           Container(
@@ -958,9 +1072,14 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                       alignment: Alignment.center,
                       child: TextField(
                         controller: barcodeController,
-                        autofocus: true,
+                        focusNode: barcodeFocus,
+                        autofocus: false, // Opsional: përdoruesi mund të klikojë për manual entry
                         textAlignVertical: TextAlignVertical.center,
                         cursorColor: Colors.black,
+                        // ✅ Opsional: Lejo të gjitha operacionet normale të TextField
+                        // (shkrim, paste, backspace, delete, arrow keys, etj.)
+                        keyboardType: TextInputType.text,
+                        textInputAction: TextInputAction.done,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -982,7 +1101,33 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                           ),
                           isDense: false,
                         ),
-                        onSubmitted: _handleBarcodeScan,
+                        onSubmitted: (value) {
+                          // ✅ Manual submit me ENTER: proceso barcode dhe rikthe fokusin te page-level
+                          if (value.trim().isNotEmpty) {
+                            _handleBarcodeScan(value);
+                            // Pastro TextField dhe rikthe fokusin pas procesimit
+                            barcodeController.clear();
+                            barcodeFocus.unfocus();
+                            _restorePageFocus();
+                          } else {
+                            // Nëse është bosh, thjesht rikthe fokusin te page-level
+                            barcodeFocus.unfocus();
+                            _restorePageFocus();
+                          }
+                        },
+                        onTap: () {
+                          // ✅ Kur përdoruesi klikon TextField për manual entry:
+                          // 1. Hiq focus nga page-level listener
+                          // 2. Pastro buffer të global listener për të shmangur konfliktin
+                          pageFocusNode.unfocus();
+                          _barcodeBuffer = '';
+                          _barcodeTimer?.cancel();
+                          _barcodeTimer = null;
+                        },
+                        // ✅ Lejo të gjitha operacionet normale: paste, select all, etj.
+                        enableInteractiveSelection: true,
+                        enableSuggestions: false,
+                        autocorrect: false,
                       ),
                     ),
                     const SizedBox(width: AppTheme.space12),
@@ -1024,8 +1169,17 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                         child: Material(
                           color: Colors.transparent,
                           child: InkWell(
-                            onTap: () =>
-                                _handleBarcodeScan(barcodeController.text),
+                            onTap: () {
+                              // ✅ Manual submit nga butoni "+": proceso barcode dhe rikthe fokusin
+                              final barcode = barcodeController.text.trim();
+                              if (barcode.isNotEmpty) {
+                                _handleBarcodeScan(barcode);
+                                // Pastro TextField dhe rikthe fokusin pas procesimit
+                                barcodeController.clear();
+                                barcodeFocus.unfocus();
+                                _restorePageFocus();
+                              }
+                            },
                             borderRadius: BorderRadius.circular(
                               AppTheme.radiusMedium,
                             ),
@@ -1371,6 +1525,7 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
           // ✅ FIXED BOTTOM BAR: Gjithmonë i dukshëm, të gjitha në një rresht
           _buildCompactBottomBar(total),
         ],
+      ),
       ),
     );
   }

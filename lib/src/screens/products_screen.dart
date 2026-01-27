@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shoe_store_manager/auth/role_store.dart';
 
 import '../local/local_api.dart';
 import '../theme/app_theme.dart';
@@ -1071,6 +1072,45 @@ class _StockBySizeDialogState extends State<_StockBySizeDialog> {
 
   int _totalStock(Map<int, int> m) => m.values.fold(0, (a, b) => a + b);
 
+  // ✅ Helper: Format size label (për shoes dhe clothes)
+  String _formatSizeLabel(int size) {
+    if (size >= 1000) {
+      // Clothes sizes
+      final index = size - 1000;
+      if (index >= 0 && index < clothSizes.length) {
+        return clothSizes[index];
+      }
+      // Fallback për size keys më të mëdha (nëse ka më shumë se clothSizes.length)
+      switch (size) {
+        case 1000:
+          return '0-3M';
+        case 1001:
+          return '3-6M';
+        case 1002:
+          return '6-9M';
+        case 1003:
+          return '9-12M';
+        case 1004:
+          return '12-18M';
+        case 1005:
+          return '18-24M';
+        case 1006:
+          return '2Y';
+        case 1007:
+          return '3Y';
+        case 1008:
+          return '4Y';
+        case 1009:
+          return '5Y';
+        case 1010:
+          return '6Y';
+        default:
+          return size.toString();
+      }
+    }
+    return size.toString(); // Normal shoe sizes (17, 18, 19, ..., 30)
+  }
+
   Future<void> _save() async {
     if (saving) return;
 
@@ -1102,6 +1142,11 @@ class _StockBySizeDialogState extends State<_StockBySizeDialog> {
     setState(() => saving = true);
     try {
       final p0 = widget.product;
+      
+      // ✅ Ruaj stokun e vjetër para se të ruaj të riun
+      final oldSizeStock = Map<int, int>.from(p0.sizeStock);
+      
+      // ✅ Ruaj produktin me stokun e ri
       await LocalApi.I.updateProduct(
         id: p0.id,
         name: p0.name,
@@ -1116,6 +1161,55 @@ class _StockBySizeDialogState extends State<_StockBySizeDialog> {
         category: p0.category,
         subcategory: p0.subcategory,
       );
+
+      // ✅ Llogaris delta (sasia e shtuar)
+      final addedBySize = <int, int>{};
+      int totalAdded = 0;
+
+      for (final entry in sizeStock.entries) {
+        final size = entry.key;
+        final newQty = entry.value;
+        final oldQty = oldSizeStock[size] ?? 0;
+        final added = newQty - oldQty;
+        
+        if (added > 0) {
+          addedBySize[size] = added;
+          totalAdded += added;
+        }
+      }
+
+      // ✅ Krijo expense entry nëse ka sasi të shtuar
+      if (totalAdded > 0 && p0.purchasePrice != null && p0.purchasePrice! > 0) {
+        try {
+          // Llogarit shumën totale
+          final expenseAmount = p0.purchasePrice! * totalAdded;
+
+          // Krijo note me detajet e shtuar
+          final addedParts = <String>[];
+          for (final entry in addedBySize.entries) {
+            final sizeLabel = _formatSizeLabel(entry.key);
+            addedParts.add('$sizeLabel=${entry.value}');
+          }
+          final addedStr = addedParts.join(', ');
+
+          // Gjej barcode (sku ose serialNumber)
+          final barcode = p0.serialNumber ?? p0.sku ?? 'N/A';
+          
+          final note = 'Blerje Malli - ${p0.name} (Barcode: $barcode) | Added: $addedStr | Total added: $totalAdded';
+
+          // Krijo expense entry
+          final userId = await RoleStore.getUserId();
+          await LocalApi.I.addExpense(
+            userId: userId > 0 ? userId : null,
+            category: 'Blerje Malli',
+            amount: expenseAmount,
+            note: note,
+          );
+        } catch (expenseError) {
+          // Mos prish ruajtjen e produktit nëse ka gabim në shpenzim
+          debugPrint('Gabim gjatë krijimit të expense: $expenseError');
+        }
+      }
 
       if (!mounted) return;
       Navigator.pop(context, true);

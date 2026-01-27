@@ -7,6 +7,8 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../local/local_api.dart';
 import '../theme/app_theme.dart';
+import '../services/pdf_service.dart';
+import '../services/file_save_service.dart';
 
 class ShpenzimetScreen extends StatefulWidget {
   const ShpenzimetScreen({super.key});
@@ -701,6 +703,10 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                         flex: 3,
                                         child: _tableHeader('Shënim'),
                                       ),
+                                      Expanded(
+                                        flex: 1,
+                                        child: _tableHeader('Printo'),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -776,6 +782,22 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                               ),
                                               maxLines: 2,
                                               overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Expanded(
+                                            flex: 1,
+                                            child: Center(
+                                              child: IconButton(
+                                                onPressed: () async {
+                                                  await _printExpense(expense);
+                                                },
+                                                icon: const Icon(
+                                                  Icons.print,
+                                                  size: 20,
+                                                ),
+                                                color: AppTheme.textPrimary,
+                                                tooltip: 'Printo Shpenzimin',
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -956,5 +978,65 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
         letterSpacing: 0.5,
       ),
     );
+  }
+
+  /// Print/Download expense PDF
+  Future<void> _printExpense(Map<String, dynamic> expense) async {
+    try {
+      final expenseId = expense['id'] as int?;
+      if (expenseId == null) {
+        _showError('Expense ID nuk u gjet');
+        return;
+      }
+
+      // Show loading
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Merr expense details
+      final expenseDetails = await LocalApi.I.getExpenseDetails(expenseId);
+      if (expenseDetails == null) {
+        if (mounted) Navigator.pop(context);
+        _showError('Shpenzimi nuk u gjet');
+        return;
+      }
+
+      final storeName = await LocalApi.I.getCurrentBusinessName();
+
+      // Gjenero PDF
+      final pdfBytes = await PdfService.buildExpensePdf(
+        category: expenseDetails['category'] as String,
+        createdAtMs: expenseDetails['createdAtMs'] as int,
+        amount: expenseDetails['amount'] as double,
+        note: expenseDetails['note'] as String?,
+        storeName: storeName,
+      );
+
+      // Close loading
+      if (mounted) Navigator.pop(context);
+
+      // Save PDF
+      final category = expenseDetails['category'] as String;
+      final date = DateTime.fromMillisecondsSinceEpoch(
+        expenseDetails['createdAtMs'] as int,
+      );
+      final dateStr = DateFormat('yyyyMMdd').format(date);
+      final fileName = 'Shpenzim_${category}_$dateStr.pdf';
+      await FileSaveService.savePdfBytes(pdfBytes, fileName);
+
+      if (!mounted) return;
+      _showSuccess('Shpenzimi u shpëtua me sukses');
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading nëse është hapur
+        _showError('Gabim gjatë printimit: $e');
+      }
+    }
   }
 }

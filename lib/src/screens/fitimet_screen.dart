@@ -7,6 +7,8 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../local/local_api.dart';
 import '../theme/app_theme.dart';
+import '../services/pdf_service.dart';
+import '../services/file_save_service.dart';
 
 class FitimetScreen extends StatefulWidget {
   const FitimetScreen({super.key});
@@ -507,15 +509,15 @@ class _FitimetScreenState extends State<FitimetScreen> {
                                             flex: 1,
                                             child: Center(
                                               child: IconButton(
-                                                onPressed: () {
-                                                  // TODO: Implement print functionality
+                                                onPressed: () async {
+                                                  await _printInvoice(sale);
                                                 },
                                                 icon: const Icon(
                                                   Icons.print,
                                                   size: 20,
                                                 ),
                                                 color: AppTheme.textPrimary,
-                                                tooltip: 'Printo',
+                                                tooltip: 'Printo Faturën',
                                               ),
                                             ),
                                           ),
@@ -654,6 +656,73 @@ class _FitimetScreenState extends State<FitimetScreen> {
         fontSize: 13,
         color: Colors.white,
         letterSpacing: 0.5,
+      ),
+    );
+  }
+
+  /// Print/Download invoice PDF
+  Future<void> _printInvoice(Map<String, dynamic> sale) async {
+    try {
+      final invoiceNo = sale['invoiceNo'] as String? ?? '';
+      if (invoiceNo.isEmpty) {
+        _showError('Invoice number nuk u gjet');
+        return;
+      }
+
+      // Show loading
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // Merr invoice details dhe items
+      final invoiceDetails = await LocalApi.I.getInvoiceDetails(invoiceNo);
+      if (invoiceDetails == null) {
+        if (mounted) Navigator.pop(context);
+        _showError('Invoice nuk u gjet');
+        return;
+      }
+
+      final items = await LocalApi.I.getInvoiceItems(invoiceNo);
+      final storeName = await LocalApi.I.getCurrentBusinessName();
+
+      // Gjenero PDF
+      final pdfBytes = await PdfService.buildInvoicePdf(
+        invoiceNo: invoiceDetails['invoiceNo'] as String,
+        createdAtMs: invoiceDetails['createdAtMs'] as int,
+        total: invoiceDetails['total'] as double,
+        profitTotal: invoiceDetails['profitTotal'] as double,
+        items: items,
+        storeName: storeName,
+      );
+
+      // Close loading
+      if (mounted) Navigator.pop(context);
+
+      // Save PDF
+      final fileName = 'Invoice_$invoiceNo.pdf';
+      await FileSaveService.savePdfBytes(pdfBytes, fileName);
+
+      if (!mounted) return;
+      _showSuccess('Fatura u shpëtua me sukses');
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading nëse është hapur
+        _showError('Gabim gjatë printimit: $e');
+      }
+    }
+  }
+
+  void _showSuccess(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.green,
       ),
     );
   }

@@ -2999,4 +2999,102 @@ WHERE ${where.join(' AND ')}
     if (business == null) throw Exception('Biznesi nuk u gjet.');
     return business.name;
   }
+
+  // ================= PDF SUPPORT METHODS =================
+
+  /// Merr invoice items për një invoice specifik
+  Future<List<Map<String, dynamic>>> getInvoiceItems(String invoiceNo) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+
+    // Gjej sale ID nga invoice number
+    final saleRows = await db.query(
+      'sales',
+      where: 'invoiceNo = ? AND revertedAtMs IS NULL',
+      whereArgs: [invoiceNo],
+      limit: 1,
+    );
+
+    if (saleRows.isEmpty) {
+      return [];
+    }
+
+    final saleId = saleRows.first['id'] as int;
+
+    // Merr sale items
+    final itemRows = await db.query(
+      'sale_items',
+      where: 'saleId = ?',
+      whereArgs: [saleId],
+    );
+
+    return itemRows.map((row) => {
+      'id': row['id'] as int?,
+      'productId': row['productId'] as int?,
+      'name': row['name'] as String? ?? '',
+      'sku': row['sku'] as String?,
+      'serialNumber': row['serialNumber'] as String?,
+      'qty': row['qty'] as int? ?? 0,
+      'unitPrice': ((row['unitPrice'] as num?) ?? 0).toDouble(),
+      'unitPurchasePrice': ((row['unitPurchasePrice'] as num?) ?? 0).toDouble(),
+      'discountPercent': ((row['discountPercent'] as num?) ?? 0).toDouble(),
+      'lineTotal': ((row['lineTotal'] as num?) ?? 0).toDouble(),
+      'lineProfit': ((row['lineProfit'] as num?) ?? 0).toDouble(),
+      'shoeSize': row['shoeSize'] as int?,
+    }).toList();
+  }
+
+  /// Merr invoice details për një invoice specifik
+  Future<Map<String, dynamic>?> getInvoiceDetails(String invoiceNo) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+
+    final rows = await db.query(
+      'sales',
+      where: 'invoiceNo = ? AND revertedAtMs IS NULL',
+      whereArgs: [invoiceNo],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final row = rows.first;
+    return {
+      'id': row['id'] as int?,
+      'invoiceNo': row['invoiceNo'] as String? ?? '',
+      'total': ((row['total'] as num?) ?? 0).toDouble(),
+      'profitTotal': ((row['profitTotal'] as num?) ?? 0).toDouble(),
+      'createdAtMs': (row['createdAtMs'] as int?) ?? 0,
+      'userId': row['userId'] as int?,
+    };
+  }
+
+  /// Merr expense details për një expense specifik
+  Future<Map<String, dynamic>?> getExpenseDetails(int expenseId) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+
+    final rows = await db.query(
+      'expenses',
+      where: 'id = ? AND revertedAtMs IS NULL',
+      whereArgs: [expenseId],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final row = rows.first;
+    return {
+      'id': row['id'] as int?,
+      'category': row['category'] as String? ?? '',
+      'amount': ((row['amount'] as num?) ?? 0).toDouble(),
+      'note': row['note'] as String?,
+      'createdAtMs': (row['createdAtMs'] as int?) ?? 0,
+      'userId': row['userId'] as int?,
+    };
+  }
 }

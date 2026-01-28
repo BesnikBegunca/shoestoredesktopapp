@@ -51,16 +51,10 @@ class _MyAppState extends State<MyApp> {
                   height: double.infinity,
                   color: AppTheme.bg,
                   child: SafeArea(
-                    child: SingleChildScrollView(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minWidth: constraints.maxWidth,
-                          minHeight: constraints.maxHeight,
-                        ),
-                        child: IntrinsicHeight(
-                          child: child!,
-                        ),
-                      ),
+                    child: SizedBox(
+                      width: constraints.maxWidth,
+                      height: constraints.maxHeight,
+                      child: child!,
                     ),
                   ),
                 );

@@ -603,21 +603,21 @@ class _HelpScreenState extends State<HelpScreen> {
     );
   }
 
-  // ✅ SVG sipas kategorisë (përshtati path-at)
+  // ✅ SVG sipas kategorisë (përdor vetëm assets ekzistues)
   String _getCategorySvg(String category) {
     switch (category) {
       case 'shitja':
-        return 'assets/icons/point_of_sale.svg';
+        return 'assets/icons/soldtoday.svg';
       case 'stoku':
-        return 'assets/icons/inventory.svg';
+        return 'assets/icons/inv.svg';
       case 'fitimet':
-        return 'assets/icons/trending_up.svg';
+        return 'assets/icons/fitimi.svg';
       case 'shpenzimet':
-        return 'assets/icons/money_off.svg';
+        return 'assets/icons/expenses.svg';
       case 'licenca':
         return 'assets/icons/key.svg';
       default:
-        return 'assets/icons/help.svg';
+        return 'assets/icons/question.svg';
     }
   }
 
@@ -672,6 +672,8 @@ class AppSvgIcon extends StatelessWidget {
       colorFilter: color == null
           ? null
           : ColorFilter.mode(color!, BlendMode.srcIn),
+      placeholderBuilder: (_) => Icon(Icons.image, size: size, color: color),
+      excludeFromSemantics: true,
     );
   }
 }

@@ -855,7 +855,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                                       ),
                                       Expanded(
                                         flex: 1,
-                                        child: _tableHeader('Printo'),
+                                        child: _Header('Printo'),
                                       ),
                                     ],
                                   ),
@@ -1128,25 +1128,6 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
       ),
     );
   }
-}
-
-// ✅ helper i vogel per header (se e kishe si funksion; e mbajta pa e ndryshu logjiken)
-class _Header extends StatelessWidget {
-  final String text;
-  const _Header(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontWeight: FontWeight.w900,
-        fontSize: 13,
-        color: Colors.white,
-        letterSpacing: 0.5,
-      ),
-    );
-  }
 
   /// Print/Download expense PDF
   Future<void> _printExpense(Map<String, dynamic> expense) async {
@@ -1206,5 +1187,24 @@ class _Header extends StatelessWidget {
         _showError('Gabim gjatë printimit: $e');
       }
     }
+  }
+}
+
+// ✅ helper i vogel per header (se e kishe si funksion; e mbajta pa e ndryshu logjiken)
+class _Header extends StatelessWidget {
+  final String text;
+  const _Header(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontWeight: FontWeight.w900,
+        fontSize: 13,
+        color: Colors.white,
+        letterSpacing: 0.5,
+      ),
+    );
   }
 }

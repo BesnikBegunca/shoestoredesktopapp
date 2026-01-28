@@ -11,6 +11,34 @@ import 'package:shoe_store_manager/printing/receipt_pdf_80mm.dart';
 import '../local/local_api.dart';
 import '../theme/app_theme.dart';
 
+/// Parses discount input and returns the discount amount in EUR to subtract from subtotal.
+/// - "10%" or "10.5%" => percentage of subtotal
+/// - "10" (no % or €) => treat as 10%
+/// - "€10" or "10€" => fixed 10 EUR
+/// Empty or invalid => 0. Result is clamped so total never goes below 0.
+double parseDiscountAmount(String input, double subtotal) {
+  final trimmed = input.trim();
+  if (trimmed.isEmpty) return 0.0;
+  final lower = trimmed.toLowerCase();
+  final hasPercent = lower.contains('%');
+  final hasEuro = lower.contains('€') || lower.contains('eur');
+  if (hasEuro) {
+    final numStr = trimmed.replaceAll(RegExp(r'[€\s]'), '').replaceAll(RegExp(r'eur', caseSensitive: false), '').trim();
+    final value = double.tryParse(numStr);
+    if (value == null || value < 0) return 0.0;
+    return value.clamp(0.0, subtotal);
+  }
+  if (hasPercent || (!hasPercent && !hasEuro)) {
+    final numStr = trimmed.replaceAll('%', '').trim();
+    final value = double.tryParse(numStr);
+    if (value == null || value < 0) return 0.0;
+    final pct = value.clamp(0.0, 100.0) / 100.0;
+    final discount = subtotal * pct;
+    return discount.clamp(0.0, subtotal);
+  }
+  return 0.0;
+}
+
 /// ✅ SIZE LABEL FORMATTER (same logic as ProductScreen)
 String formatSizeLabel(int size) {
   switch (size) {
@@ -524,20 +552,216 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
   }
 
   Future<void> _confirmPayment() async {
-    final total = cart.fold<double>(0, (sum, item) => sum + item.lineTotal);
-
+    final subtotal = cart.fold<double>(0, (sum, item) => sum + item.lineTotal);
     final amountGiven = double.tryParse(amountController.text) ?? 0.0;
-    if (amountGiven < total) {
+    if (amountGiven <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Shuma e dhënë është më e vogël se totali'),
+          content: Text('Vendosni shumën e dhënë'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    await _processPayment(amountGiven, amountGiven - total);
+    final discountController = TextEditingController();
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dCtx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final discountInput = discountController.text;
+          final discountAmount = parseDiscountAmount(discountInput, subtotal);
+          final discountedTotal = (subtotal - discountAmount).clamp(0.0, double.infinity);
+          final change = amountGiven - discountedTotal;
+          final canPay = amountGiven >= discountedTotal;
+
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 550, minWidth: 450),
+              child: Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Konfirmo Pagesën',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 22,
+                        color: Colors.black,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: AppTheme.bg,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          _paymentRow('Totali (para zbritjes):', '€${subtotal.toStringAsFixed(2)}'),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: discountController,
+                            onChanged: (_) => setDialogState(() {}),
+                            keyboardType: TextInputType.text,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'Apliko zbritje',
+                              labelStyle: const TextStyle(
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                              hintText: '10% ose 5 ose €10',
+                              hintStyle: TextStyle(
+                                color: Colors.black87.withOpacity(0.4),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _paymentRow('Totali:', '€${discountedTotal.toStringAsFixed(2)}'),
+                          const SizedBox(height: 10),
+                          _paymentRow('Para të dhëna:', '€${amountGiven.toStringAsFixed(2)}'),
+                          const SizedBox(height: 10),
+                          _paymentRow(
+                            change >= 0 ? 'Kthim:' : 'Mungon:',
+                            '€${change.abs().toStringAsFixed(2)}',
+                            isHighlight: true,
+                            isNegative: change < 0,
+                          ),
+                          if (!canPay && amountGiven > 0) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              'Shuma e dhënë është më e vogël se totali',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red.shade700,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(dCtx);
+                          },
+                          child: const Text(
+                            'Anulo',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            OutlinedButton.icon(
+                          onPressed: null,
+                          icon: const Icon(Icons.print, size: 18),
+                          label: const Text(
+                            'Print',
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.black87,
+                            side: BorderSide(color: Colors.grey.shade400, width: 1.5),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: canPay
+                              ? () {
+                                  Navigator.pop(dCtx);
+                                  _processPayment(
+                                    amountGiven,
+                                    change,
+                                    discountAmount: discountAmount,
+                                  );
+                                }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black87,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Paguaj',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    discountController.dispose();
+  }
+
+  Widget _paymentRow(String label, String value, {bool isHighlight = false, bool isNegative = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: Colors.black.withOpacity(0.7),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            color: isHighlight
+                ? (isNegative ? Colors.red : Colors.green)
+                : Colors.black,
+          ),
+        ),
+      ],
+    );
   }
 
   // ✅ OLD: _showPaymentDialog - ruajtur për referencë (mund të fshihet më vonë)
@@ -786,7 +1010,11 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
     );
   }
 
-  Future<void> _processPayment(double amountGiven, double change) async {
+  Future<void> _processPayment(
+    double amountGiven,
+    double change, {
+    double? discountAmount,
+  }) async {
     setState(() => checkingOut = true);
     try {
       final uid = await RoleStore.getUserId();
@@ -794,7 +1022,11 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
         throw Exception('UserId s\'osht i logum (uid=$uid). Bëj logout/login.');
       }
 
-      final res = await LocalApi.I.sellMany(cartItems: cart, userId: uid);
+      final res = await LocalApi.I.sellMany(
+        cartItems: cart,
+        userId: uid,
+        discountAmount: discountAmount,
+      );
 
       // Store cart items for receipt before clearing
       final cartItemsForReceipt = List<CartItem>.from(cart);
@@ -933,7 +1165,7 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                           elevation: 0,
                         ),
                         child: const Text(
-                          'OK',
+                          'Paguaj',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,

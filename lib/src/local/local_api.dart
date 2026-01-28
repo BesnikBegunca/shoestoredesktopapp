@@ -1716,6 +1716,7 @@ class LocalApi {
   Future<SellResult> sellMany({
     required List<CartItem> cartItems,
     required int userId,
+    double? discountAmount,
   }) async {
     if (cartItems.isEmpty) throw Exception('Cart is empty.');
 
@@ -1831,6 +1832,11 @@ class LocalApi {
 
       total = round2(total);
       totalProfit = round2(totalProfit);
+
+      if (discountAmount != null && discountAmount > 0) {
+        total = (total - discountAmount).clamp(0.0, double.infinity);
+        total = round2(total);
+      }
 
       final invNo = 'INV-$nowMs';
       final saleId = await tx.insert('sales', {

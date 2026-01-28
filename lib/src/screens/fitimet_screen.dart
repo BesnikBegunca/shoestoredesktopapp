@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/widgets.dart' as pw show PdfGoogleFonts;
 
 import '../local/local_api.dart';
 import '../theme/app_theme.dart';
@@ -33,8 +34,10 @@ class _FitimetScreenState extends State<FitimetScreen> {
     setState(() => _loading = true);
     try {
       final sales = await LocalApi.I.getSalesForPeriod(period: _selectedPeriod);
-      final summary = await LocalApi.I.getProfitSummary(period: _selectedPeriod);
-      
+      final summary = await LocalApi.I.getProfitSummary(
+        period: _selectedPeriod,
+      );
+
       if (!mounted) return;
       setState(() {
         _sales = sales;
@@ -50,12 +53,9 @@ class _FitimetScreenState extends State<FitimetScreen> {
 
   void _showError(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: Colors.red,
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 
   String _getPeriodLabel() {
@@ -83,6 +83,10 @@ class _FitimetScreenState extends State<FitimetScreen> {
   Future<void> _printReport() async {
     final pdf = pw.Document();
 
+    // Load font that supports Euro symbol
+    final font = await PdfGoogleFonts.notoSansRegular();
+    final fontBold = await PdfGoogleFonts.notoSansBold();
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -96,12 +100,13 @@ class _FitimetScreenState extends State<FitimetScreen> {
                 style: pw.TextStyle(
                   fontSize: 24,
                   fontWeight: pw.FontWeight.bold,
+                  font: fontBold,
                 ),
               ),
               pw.SizedBox(height: 10),
               pw.Text(
                 'Data e printimit: ${_formatDate(DateTime.now().millisecondsSinceEpoch)}',
-                style: const pw.TextStyle(fontSize: 12),
+                style: pw.TextStyle(fontSize: 12, font: font),
               ),
               pw.SizedBox(height: 20),
 
@@ -118,32 +123,73 @@ class _FitimetScreenState extends State<FitimetScreen> {
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Shitje Totale:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        pw.Text(_formatCurrency(_summary['totalSales'] ?? 0)),
+                        pw.Text(
+                          'Shitje Totale:',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
+                        ),
+                        pw.Text(
+                          _formatCurrency(_summary['totalSales'] ?? 0),
+                          style: pw.TextStyle(font: font),
+                        ),
                       ],
                     ),
                     pw.SizedBox(height: 8),
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Fitim Bruto:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        pw.Text(_formatCurrency(_summary['totalProfit'] ?? 0)),
+                        pw.Text(
+                          'Fitim Bruto:',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
+                        ),
+                        pw.Text(
+                          _formatCurrency(_summary['totalProfit'] ?? 0),
+                          style: pw.TextStyle(font: font),
+                        ),
                       ],
                     ),
                     pw.SizedBox(height: 8),
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Shpenzime:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        pw.Text(_formatCurrency(_summary['totalExpenses'] ?? 0)),
+                        pw.Text(
+                          'Shpenzime:',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
+                        ),
+                        pw.Text(
+                          _formatCurrency(_summary['totalExpenses'] ?? 0),
+                          style: pw.TextStyle(font: font),
+                        ),
                       ],
                     ),
                     pw.Divider(),
                     pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Text('Fitim Neto:', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-                        pw.Text(_formatCurrency(_summary['netProfit'] ?? 0), style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                        pw.Text(
+                          'Fitim Neto:',
+                          style: pw.TextStyle(
+                            fontSize: 16,
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
+                        ),
+                        pw.Text(
+                          _formatCurrency(_summary['netProfit'] ?? 0),
+                          style: pw.TextStyle(
+                            fontSize: 16,
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -155,7 +201,11 @@ class _FitimetScreenState extends State<FitimetScreen> {
               // Sales Table
               pw.Text(
                 'Lista e Shitjeve (${(_summary['count'] ?? 0).toInt()} total)',
-                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  font: fontBold,
+                ),
               ),
               pw.SizedBox(height: 10),
 
@@ -164,23 +214,49 @@ class _FitimetScreenState extends State<FitimetScreen> {
                 children: [
                   // Header
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                    decoration: const pw.BoxDecoration(
+                      color: PdfColors.grey300,
+                    ),
                     children: [
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text('Invoice', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        child: pw.Text(
+                          'Invoice',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
+                        ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text('Data', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        child: pw.Text(
+                          'Data',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
+                        ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text('Totali', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        child: pw.Text(
+                          'Totali',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
+                        ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
-                        child: pw.Text('Fitimi', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        child: pw.Text(
+                          'Fitimi',
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -190,19 +266,31 @@ class _FitimetScreenState extends State<FitimetScreen> {
                       children: [
                         pw.Padding(
                           padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(sale['invoiceNo'] ?? ''),
+                          child: pw.Text(
+                            sale['invoiceNo'] ?? '',
+                            style: pw.TextStyle(font: font),
+                          ),
                         ),
                         pw.Padding(
                           padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(_formatDate(sale['createdAtMs'] ?? 0)),
+                          child: pw.Text(
+                            _formatDate(sale['createdAtMs'] ?? 0),
+                            style: pw.TextStyle(font: font),
+                          ),
                         ),
                         pw.Padding(
                           padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(_formatCurrency(sale['total'] ?? 0)),
+                          child: pw.Text(
+                            _formatCurrency(sale['total'] ?? 0),
+                            style: pw.TextStyle(font: font),
+                          ),
                         ),
                         pw.Padding(
                           padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(_formatCurrency(sale['profitTotal'] ?? 0)),
+                          child: pw.Text(
+                            _formatCurrency(sale['profitTotal'] ?? 0),
+                            style: pw.TextStyle(font: font),
+                          ),
                         ),
                       ],
                     );
@@ -215,8 +303,9 @@ class _FitimetScreenState extends State<FitimetScreen> {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
+    await Printing.sharePdf(
+      bytes: await pdf.save(),
+      filename: 'Raporti_Fitimet.pdf',
     );
   }
 
@@ -228,9 +317,7 @@ class _FitimetScreenState extends State<FitimetScreen> {
         children: [
           // Header
           Container(
-            decoration: const BoxDecoration(
-              color: AppTheme.bgPage,
-            ),
+            decoration: const BoxDecoration(color: AppTheme.bgPage),
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,7 +361,7 @@ class _FitimetScreenState extends State<FitimetScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Period filters
                 Row(
                   children: [
@@ -304,17 +391,22 @@ class _FitimetScreenState extends State<FitimetScreen> {
                             Expanded(
                               child: _summaryCard(
                                 title: 'Shitje Totale',
-                                value: _formatCurrency(_summary['totalSales'] ?? 0),
+                                value: _formatCurrency(
+                                  _summary['totalSales'] ?? 0,
+                                ),
                                 icon: Icons.shopping_cart,
                                 color: Colors.blue,
-                                subtitle: '${(_summary['count'] ?? 0).toInt()} transaksione',
+                                subtitle:
+                                    '${(_summary['count'] ?? 0).toInt()} transaksione',
                               ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: _summaryCard(
                                 title: 'Fitim Bruto',
-                                value: _formatCurrency(_summary['totalProfit'] ?? 0),
+                                value: _formatCurrency(
+                                  _summary['totalProfit'] ?? 0,
+                                ),
                                 icon: Icons.attach_money,
                                 color: Colors.green,
                                 subtitle: 'Para shpenzimeve',
@@ -324,7 +416,9 @@ class _FitimetScreenState extends State<FitimetScreen> {
                             Expanded(
                               child: _summaryCard(
                                 title: 'Shpenzime',
-                                value: _formatCurrency(_summary['totalExpenses'] ?? 0),
+                                value: _formatCurrency(
+                                  _summary['totalExpenses'] ?? 0,
+                                ),
                                 icon: Icons.money_off,
                                 color: Colors.orange,
                                 subtitle: 'Totali i shpenzimeve',
@@ -334,10 +428,12 @@ class _FitimetScreenState extends State<FitimetScreen> {
                             Expanded(
                               child: _summaryCard(
                                 title: 'Fitim Neto',
-                                value: _formatCurrency(_summary['netProfit'] ?? 0),
+                                value: _formatCurrency(
+                                  _summary['netProfit'] ?? 0,
+                                ),
                                 icon: Icons.account_balance_wallet,
-                                color: (_summary['netProfit'] ?? 0) >= 0 
-                                    ? Colors.green.shade700 
+                                color: (_summary['netProfit'] ?? 0) >= 0
+                                    ? Colors.green.shade700
                                     : Colors.red,
                                 subtitle: 'Fitimi final',
                               ),
@@ -350,7 +446,11 @@ class _FitimetScreenState extends State<FitimetScreen> {
                         // Sales Table
                         Row(
                           children: [
-                            const Icon(Icons.list_alt, size: 24, color: AppTheme.text),
+                            const Icon(
+                              Icons.list_alt,
+                              size: 24,
+                              color: AppTheme.text,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               'Lista e Shitjeve - ${_getPeriodLabel()}',
@@ -451,12 +551,15 @@ class _FitimetScreenState extends State<FitimetScreen> {
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
                                   itemCount: _sales.length,
-                                  separatorBuilder: (_, __) => const Divider(height: 1),
+                                  separatorBuilder: (_, __) =>
+                                      const Divider(height: 1),
                                   itemBuilder: (_, i) {
                                     final sale = _sales[i];
                                     final total = sale['total'] ?? 0.0;
                                     final profit = sale['profitTotal'] ?? 0.0;
-                                    final margin = total > 0 ? (profit / total * 100) : 0.0;
+                                    final margin = total > 0
+                                        ? (profit / total * 100)
+                                        : 0.0;
 
                                     return Container(
                                       padding: const EdgeInsets.all(20),
@@ -476,7 +579,9 @@ class _FitimetScreenState extends State<FitimetScreen> {
                                           Expanded(
                                             flex: 3,
                                             child: Text(
-                                              _formatDate(sale['createdAtMs'] ?? 0),
+                                              _formatDate(
+                                                sale['createdAtMs'] ?? 0,
+                                              ),
                                               style: TextStyle(
                                                 color: AppTheme.muted,
                                                 fontWeight: FontWeight.w600,
@@ -540,7 +645,7 @@ class _FitimetScreenState extends State<FitimetScreen> {
 
   Widget _periodButton(String label, String period) {
     final isSelected = _selectedPeriod == period;
-    
+
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -553,14 +658,10 @@ class _FitimetScreenState extends State<FitimetScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: isSelected 
-                  ? Colors.green.shade700
-                  : Colors.white,
+              color: isSelected ? Colors.green.shade700 : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isSelected 
-                    ? Colors.green.shade700
-                    : AppTheme.stroke,
+                color: isSelected ? Colors.green.shade700 : AppTheme.stroke,
                 width: 2,
               ),
             ),
@@ -674,9 +775,7 @@ class _FitimetScreenState extends State<FitimetScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (ctx) => const Center(child: CircularProgressIndicator()),
       );
 
       // Merr invoice details dhe items
@@ -719,11 +818,8 @@ class _FitimetScreenState extends State<FitimetScreen> {
 
   void _showSuccess(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: Colors.green,
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.green));
   }
 }

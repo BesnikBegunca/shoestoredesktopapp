@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/widgets.dart' as pw show PdfGoogleFonts;
 
 import '../local/local_api.dart';
 import '../theme/app_theme.dart';
@@ -149,6 +150,10 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
   Future<void> _printReport() async {
     final pdf = pw.Document();
 
+    // Load font that supports Euro symbol
+    final font = await PdfGoogleFonts.notoSansRegular();
+    final fontBold = await PdfGoogleFonts.notoSansBold();
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -161,12 +166,13 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                 style: pw.TextStyle(
                   fontSize: 24,
                   fontWeight: pw.FontWeight.bold,
+                  font: fontBold,
                 ),
               ),
               pw.SizedBox(height: 10),
               pw.Text(
                 'Data e printimit: ${_formatDate(DateTime.now().millisecondsSinceEpoch)}',
-                style: const pw.TextStyle(fontSize: 12),
+                style: pw.TextStyle(fontSize: 12, font: font),
               ),
               pw.SizedBox(height: 20),
 
@@ -184,10 +190,14 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                       children: [
                         pw.Text(
                           'Shpenzime Operative:',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
                         ),
                         pw.Text(
                           _formatCurrency(_summary['expensesTotal'] ?? 0),
+                          style: pw.TextStyle(font: font),
                         ),
                       ],
                     ),
@@ -197,9 +207,15 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                       children: [
                         pw.Text(
                           'Blerje Malli:',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
                         ),
-                        pw.Text(_formatCurrency(_summary['investTotal'] ?? 0)),
+                        pw.Text(
+                          _formatCurrency(_summary['investTotal'] ?? 0),
+                          style: pw.TextStyle(font: font),
+                        ),
                       ],
                     ),
                     pw.Divider(),
@@ -211,6 +227,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                           style: pw.TextStyle(
                             fontSize: 16,
                             fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
                           ),
                         ),
                         pw.Text(
@@ -218,6 +235,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                           style: pw.TextStyle(
                             fontSize: 16,
                             fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
                           ),
                         ),
                       ],
@@ -233,6 +251,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                 style: pw.TextStyle(
                   fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
+                  font: fontBold,
                 ),
               ),
               pw.SizedBox(height: 10),
@@ -249,28 +268,40 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                         padding: const pw.EdgeInsets.all(8),
                         child: pw.Text(
                           'Kategoria',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
                         ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
                         child: pw.Text(
                           'Data',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
                         ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
                         child: pw.Text(
                           'Shuma',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
                         ),
                       ),
                       pw.Padding(
                         padding: const pw.EdgeInsets.all(8),
                         child: pw.Text(
                           'Shënim',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            font: fontBold,
+                          ),
                         ),
                       ),
                     ],
@@ -280,23 +311,31 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
                       children: [
                         pw.Padding(
                           padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(expense['category'] ?? ''),
+                          child: pw.Text(
+                            expense['category'] ?? '',
+                            style: pw.TextStyle(font: font),
+                          ),
                         ),
                         pw.Padding(
                           padding: const pw.EdgeInsets.all(8),
                           child: pw.Text(
                             _formatDate(expense['createdAtMs'] ?? 0),
+                            style: pw.TextStyle(font: font),
                           ),
                         ),
                         pw.Padding(
                           padding: const pw.EdgeInsets.all(8),
                           child: pw.Text(
                             _formatCurrency(expense['amount'] ?? 0),
+                            style: pw.TextStyle(font: font),
                           ),
                         ),
                         pw.Padding(
                           padding: const pw.EdgeInsets.all(8),
-                          child: pw.Text(expense['note'] ?? '—'),
+                          child: pw.Text(
+                            expense['note'] ?? '—',
+                            style: pw.TextStyle(font: font),
+                          ),
                         ),
                       ],
                     );
@@ -309,7 +348,10 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
       ),
     );
 
-    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+    await Printing.sharePdf(
+      bytes: await pdf.save(),
+      filename: 'Raporti_Shpenzime.pdf',
+    );
   }
 
   @override
@@ -1143,9 +1185,7 @@ class _ShpenzimetScreenState extends State<ShpenzimetScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (ctx) => const Center(child: CircularProgressIndicator()),
       );
 
       // Merr expense details

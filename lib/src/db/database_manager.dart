@@ -187,7 +187,10 @@ class DatabaseManager {
         notes TEXT,
         createdByUserId INTEGER NOT NULL,
         createdAtMs INTEGER NOT NULL,
-        active INTEGER NOT NULL DEFAULT 1
+        active INTEGER NOT NULL DEFAULT 1,
+        defaultPrinter TEXT,
+        profitsOutput TEXT,
+        expensesOutput TEXT
       )
     ''');
     

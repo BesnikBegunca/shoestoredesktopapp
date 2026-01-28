@@ -16,7 +16,7 @@ import '../license/license_service.dart';
 
 /// ✅ DB VERSION
 /// IMPORTANT: Kur shton tabela/kolona, rrite version-in
-const int kDbVersion = 11;
+const int kDbVersion = 12;
 
 /* ======================= SQL ======================= */
 
@@ -172,7 +172,10 @@ CREATE TABLE IF NOT EXISTS businesses (
   notes TEXT,
   createdByUserId INTEGER NOT NULL,
   createdAtMs INTEGER NOT NULL,
-  active INTEGER NOT NULL DEFAULT 1
+  active INTEGER NOT NULL DEFAULT 1,
+  defaultPrinter TEXT,
+  profitsOutput TEXT,
+  expensesOutput TEXT
 );
 ''';
 
@@ -1167,6 +1170,32 @@ class LocalApi {
       where: 'businessId = ?',
       whereArgs: [businessId],
     );
+  }
+
+  // ================= BUSINESS SETTINGS =================
+
+  /// Update business settings (printer and output preferences)
+  Future<void> updateBusinessSettings({
+    required int businessId,
+    String? defaultPrinter,
+    String? profitsOutput,
+    String? expensesOutput,
+  }) async {
+    final adminDb = await DatabaseManager.getAdminDb();
+
+    final data = <String, Object?>{};
+    if (defaultPrinter != null) data['defaultPrinter'] = defaultPrinter.trim().isEmpty ? null : defaultPrinter.trim();
+    if (profitsOutput != null) data['profitsOutput'] = profitsOutput.trim().isEmpty ? null : profitsOutput.trim();
+    if (expensesOutput != null) data['expensesOutput'] = expensesOutput.trim().isEmpty ? null : expensesOutput.trim();
+
+    if (data.isNotEmpty) {
+      await adminDb.update(
+        'businesses',
+        data,
+        where: 'id = ?',
+        whereArgs: [businessId],
+      );
+    }
   }
 
   // ================= BUSINESS LICENSES =================

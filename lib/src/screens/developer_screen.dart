@@ -1534,39 +1534,49 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
                               ),
                               
                               // ✅ Actions
-                              SizedBox(
-                                width: 140,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    // License button
-                                    ElevatedButton.icon(
-                                      onPressed: () => _showLicenseDialog(b),
-                                      icon: const Icon(Icons.vpn_key, size: 12),
-                                      label: const Text(
-                                        'Licenca',
-                                        style: TextStyle(fontSize: 10),
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF6366F1),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                        minimumSize: const Size(0, 28),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    // Delete button
-                                    IconButton(
-                                      onPressed: () => _confirmDeleteBusiness(b),
-                                      icon: const Icon(Icons.delete_outline, size: 18),
-                                      color: Colors.red,
-                                      padding: const EdgeInsets.all(4),
-                                      constraints: const BoxConstraints(),
-                                      tooltip: 'Fshi Biznesin',
-                                    ),
-                                  ],
+                        SizedBox(
+                          width: 180,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Settings button
+                              IconButton(
+                                onPressed: () => _showBusinessSettingsDialog(b),
+                                icon: const Icon(Icons.settings, size: 18),
+                                color: const Color(0xFF6366F1),
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(),
+                                tooltip: 'Konfiguro Cilësimet',
+                              ),
+                              const SizedBox(width: 4),
+                              // License button
+                              ElevatedButton.icon(
+                                onPressed: () => _showLicenseDialog(b),
+                                icon: const Icon(Icons.vpn_key, size: 12),
+                                label: const Text(
+                                  'Licenca',
+                                  style: TextStyle(fontSize: 10),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF6366F1),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                  minimumSize: const Size(0, 28),
                                 ),
                               ),
+                              const SizedBox(width: 6),
+                              // Delete button
+                              IconButton(
+                                onPressed: () => _confirmDeleteBusiness(b),
+                                icon: const Icon(Icons.delete_outline, size: 18),
+                                color: Colors.red,
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(),
+                                tooltip: 'Fshi Biznesin',
+                              ),
+                            ],
+                          ),
+                        ),
                             ],
                           ),
                         );
@@ -1923,6 +1933,355 @@ class _DeveloperScreenState extends State<DeveloperScreen> {
           Text(
             value,
             style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showBusinessSettingsDialog(Business business) async {
+    final nameController = TextEditingController(text: business.name);
+    final addressController = TextEditingController(text: business.address ?? '');
+    final cityController = TextEditingController(text: business.city ?? '');
+    final postalCodeController = TextEditingController(text: business.postalCode ?? '');
+    final phoneController = TextEditingController(text: business.phone ?? '');
+    final emailController = TextEditingController(text: business.email ?? '');
+    final ownerNameController = TextEditingController(text: business.ownerName ?? '');
+    final taxIdController = TextEditingController(text: business.taxId ?? '');
+    final registrationNumberController = TextEditingController(text: business.registrationNumber ?? '');
+    final contactPersonController = TextEditingController(text: business.contactPerson ?? '');
+    final websiteController = TextEditingController(text: business.website ?? '');
+    final notesController = TextEditingController(text: business.notes ?? '');
+    final defaultPrinterController = TextEditingController(text: business.defaultPrinter ?? '');
+    final profitsOutputController = TextEditingController(text: business.profitsOutput ?? '');
+    final expensesOutputController = TextEditingController(text: business.expensesOutput ?? '');
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.business, color: Color(0xFF6366F1)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Konfiguro Cilësimet - ${business.name}',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 600,
+          height: 600,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Informacionet e Biznesit',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                Material(
+                  type: MaterialType.transparency,
+                  child: TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Emri i Biznesit',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.business),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: addressController,
+                          decoration: const InputDecoration(
+                            labelText: 'Adresa',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.location_on),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: cityController,
+                          decoration: const InputDecoration(
+                            labelText: 'Qyteti',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.location_city),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: postalCodeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Kodi Postar',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.local_post_office),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: phoneController,
+                          decoration: const InputDecoration(
+                            labelText: 'Telefoni',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.phone),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: emailController,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.email),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: ownerNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Pronari',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.person),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: taxIdController,
+                          decoration: const InputDecoration(
+                            labelText: 'Numri i Tatimit',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.account_balance),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: registrationNumberController,
+                          decoration: const InputDecoration(
+                            labelText: 'Numri i Regjistrimit',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.assignment),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: contactPersonController,
+                          decoration: const InputDecoration(
+                            labelText: 'Personi Kontaktues',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.contact_phone),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: websiteController,
+                          decoration: const InputDecoration(
+                            labelText: 'Website',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.web),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Material(
+                  type: MaterialType.transparency,
+                  child: TextField(
+                    controller: notesController,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Shënime',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.note),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 16),
+                const Text(
+                  'Cilësimet e Printimit',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                Material(
+                  type: MaterialType.transparency,
+                  child: TextField(
+                    controller: defaultPrinterController,
+                    decoration: const InputDecoration(
+                      labelText: 'Printeri Default',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.print),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: profitsOutputController,
+                          decoration: const InputDecoration(
+                            labelText: 'Outputi i Fitimeve (print/pdf)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.trending_up),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextField(
+                          controller: expensesOutputController,
+                          decoration: const InputDecoration(
+                            labelText: 'Outputi i Shpenzimeve (print/pdf)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.trending_down),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Mbyll'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              if (name.isEmpty) {
+                _showError('Emri i biznesit nuk mund të jetë i zbrazët!');
+                return;
+              }
+
+              try {
+                setState(() => _loading = true);
+
+                // Update business info
+                await LocalApi.I.updateBusiness(
+                  businessId: business.id,
+                  name: name,
+                  address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
+                  city: cityController.text.trim().isEmpty ? null : cityController.text.trim(),
+                  postalCode: postalCodeController.text.trim().isEmpty ? null : postalCodeController.text.trim(),
+                  phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
+                  email: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
+                  ownerName: ownerNameController.text.trim().isEmpty ? null : ownerNameController.text.trim(),
+                  taxId: taxIdController.text.trim().isEmpty ? null : taxIdController.text.trim(),
+                  registrationNumber: registrationNumberController.text.trim().isEmpty ? null : registrationNumberController.text.trim(),
+                  contactPerson: contactPersonController.text.trim().isEmpty ? null : contactPersonController.text.trim(),
+                  website: websiteController.text.trim().isEmpty ? null : websiteController.text.trim(),
+                  notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                );
+
+                // Update business settings
+                await LocalApi.I.updateBusinessSettings(
+                  businessId: business.id,
+                  defaultPrinter: defaultPrinterController.text.trim().isEmpty ? null : defaultPrinterController.text.trim(),
+                  profitsOutput: profitsOutputController.text.trim().isEmpty ? null : profitsOutputController.text.trim(),
+                  expensesOutput: expensesOutputController.text.trim().isEmpty ? null : expensesOutputController.text.trim(),
+                );
+
+                if (!mounted) return;
+                _showSuccess('Cilësimet u përditësuan me sukses! ✅');
+                Navigator.pop(ctx);
+                await _loadBusinesses();
+              } catch (e) {
+                if (!mounted) return;
+                final errorMsg = e.toString();
+                _showError('Gabim: ${errorMsg.length > 100 ? errorMsg.substring(0, 100) + "..." : errorMsg}');
+              } finally {
+                if (mounted) setState(() => _loading = false);
+              }
+            },
+            icon: const Icon(Icons.save),
+            label: const Text('Ruaj'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+            ),
           ),
         ],
       ),

@@ -17,6 +17,11 @@ class Business {
   final int createdAtMs;
   final bool active;
 
+  // ✅ NEW: Business settings
+  final String? defaultPrinter; // Default printer name for invoices and receipts
+  final String? profitsOutput; // 'print' or 'pdf' for profits reports
+  final String? expensesOutput; // 'print' or 'pdf' for expenses reports
+
   const Business({
     required this.id,
     required this.name,
@@ -35,6 +40,9 @@ class Business {
     required this.createdByUserId,
     required this.createdAtMs,
     required this.active,
+    this.defaultPrinter,
+    this.profitsOutput,
+    this.expensesOutput,
   });
 
   static Business fromRow(Map<String, Object?> r) => Business(
@@ -55,6 +63,9 @@ class Business {
     createdByUserId: (r['createdByUserId'] as int?) ?? 0,
     createdAtMs: (r['createdAtMs'] as int?) ?? 0,
     active: ((r['active'] as int?) ?? 1) == 1,
+    defaultPrinter: r['defaultPrinter'] as String?,
+    profitsOutput: r['profitsOutput'] as String?,
+    expensesOutput: r['expensesOutput'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -75,5 +86,8 @@ class Business {
     'createdByUserId': createdByUserId,
     'createdAtMs': createdAtMs,
     'active': active ? 1 : 0,
+    'defaultPrinter': defaultPrinter,
+    'profitsOutput': profitsOutput,
+    'expensesOutput': expensesOutput,
   };
 }

@@ -47,8 +47,21 @@ CREATE TABLE IF NOT EXISTS products (
   sizeStockJson TEXT,
   category TEXT,
   subcategory TEXT,
+  is_set INTEGER NOT NULL DEFAULT 0,
   createdAtMs INTEGER,
   updatedAtMs INTEGER
+);
+''';
+
+const String kSqlCreateSetComponents = '''
+CREATE TABLE IF NOT EXISTS set_components (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  parent_product_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  qty INTEGER NOT NULL DEFAULT 1,
+  variant TEXT,
+  createdAtMs INTEGER,
+  FOREIGN KEY (parent_product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 ''';
 
@@ -221,6 +234,30 @@ String _encodeSizeStock(Map<int, int> sizeStock) {
 int _totalStock(Map<int, int> sizeStock) =>
     sizeStock.values.fold(0, (a, b) => a + (b < 0 ? 0 : b));
 
+/// Konverton optional_size (string "38" ose "6-9M") në çelës int për sizeStock
+int? _optionalSizeToKey(String? s) {
+  if (s == null || s.trim().isEmpty) return null;
+  final t = s.trim();
+  final n = int.tryParse(t);
+  if (n != null) return n;
+  const map = {
+    '0-3M': 1000, '3-6M': 1001, '6-9M': 1002, '9-12M': 1003,
+    '12-18M': 1004, '18-24M': 1005, '2Y': 1006, '3Y': 1007,
+    '4Y': 1008, '5Y': 1009, '6Y': 1010,
+  };
+  return map[t] ?? map[t.replaceAll(' ', '')];
+}
+
+/// Çelës int (1000..1010 ose 17..30) në string për variant.size
+String _sizeKeyToVariantSize(int key) {
+  const map = {
+    1000: '0-3M', 1001: '3-6M', 1002: '6-9M', 1003: '9-12M',
+    1004: '12-18M', 1005: '18-24M', 1006: '2Y', 1007: '3Y',
+    1008: '4Y', 1009: '5Y', 1010: '6Y',
+  };
+  return map[key] ?? key.toString();
+}
+
 /* ======================= SKU GENERATION ======================= */
 
 // Mapping për kategori dhe subkategori
@@ -290,6 +327,33 @@ String generateVariantSku({
 
 /* ======================= MODELS ======================= */
 
+/// Komponent i një SET (bundle) – përcaktuar inline (emër, sasi, variant) për të njëjtin produkt
+class SetComponent {
+  final int? id;
+  final int parentSetProductId;
+  final String name;
+  final int qty;
+  final String? variant;
+
+  const SetComponent({
+    this.id,
+    required this.parentSetProductId,
+    required this.name,
+    this.qty = 1,
+    this.variant,
+  });
+
+  static SetComponent fromRow(Map<String, Object?> r) {
+    return SetComponent(
+      id: r['id'] as int?,
+      parentSetProductId: (r['parent_product_id'] as int?) ?? (r['parent_set_product_id'] as int?) ?? 0,
+      name: (r['name'] as String?)?.trim() ?? '',
+      qty: (r['qty'] as int?) ?? (r['default_qty'] as int?) ?? 1,
+      variant: (r['variant'] as String?)?.trim().isEmpty == true ? null : (r['variant'] as String?) ?? r['optional_size'] as String?,
+    );
+  }
+}
+
 class Product {
   final int id;
   final String name;
@@ -304,6 +368,7 @@ class Product {
   final Map<int, int> sizeStock;
   final String? category;
   final String? subcategory;
+  final bool isSet;
   final int? createdAtMs;
   final int? updatedAtMs;
 
@@ -321,6 +386,7 @@ class Product {
     required this.sizeStock,
     this.category,
     this.subcategory,
+    this.isSet = false,
     this.createdAtMs,
     this.updatedAtMs,
   });
@@ -360,6 +426,7 @@ class Product {
       sizeStock: sizeStock,
       category: r['category'] as String?,
       subcategory: r['subcategory'] as String?,
+      isSet: ((r['is_set'] as int?) ?? 0) == 1,
       createdAtMs: r['createdAtMs'] as int?,
       updatedAtMs: r['updatedAtMs'] as int?,
     );
@@ -547,6 +614,13 @@ class CartItem {
   final String? variantSku; // SKU e variantit
   final String? variantSize; // Masa e variantit si string
 
+  /// Shitet si SET i tërë (zbritje nga stoku i setit)
+  final bool soldAsSet;
+  /// Nëse është linjë nga ndarja e SET-it, ID i SET-it prind
+  final int? parentSetProductId;
+  /// Emri i komponentit (për linjat e ndara, p.sh. "Bluzë", "Pantallona")
+  final String? componentName;
+
   CartItem({
     required this.product,
     required this.size,
@@ -554,6 +628,9 @@ class CartItem {
     this.variantId,
     this.variantSku,
     this.variantSize,
+    this.soldAsSet = false,
+    this.parentSetProductId,
+    this.componentName,
   });
 
   double get unitPrice => product.finalPrice;
@@ -1410,6 +1487,85 @@ class LocalApi {
     );
   }
 
+  /// Merr produktin me ID
+  Future<Product?> getProductById(int productId) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) return null;
+    final rows = await db.query(
+      'products',
+      where: 'id = ?',
+      whereArgs: [productId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return Product.fromRow(rows.first);
+  }
+
+  /// Merr komponentët e një SET (inline: emër, sasi, variant)
+  Future<List<SetComponent>> getSetComponents(int parentSetProductId) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) return [];
+    try {
+      final rows = await db.query(
+        'set_components',
+        where: 'parent_product_id = ?',
+        whereArgs: [parentSetProductId],
+        orderBy: 'id ASC',
+      );
+      return rows.map(SetComponent.fromRow).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Ruaj komponentët e një SET (fshin të vjetrit dhe shton të rinj)
+  Future<void> saveSetComponents(
+    int parentSetProductId,
+    List<SetComponent> components,
+  ) async {
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await db.transaction((tx) async {
+      await tx.delete(
+        'set_components',
+        where: 'parent_product_id = ?',
+        whereArgs: [parentSetProductId],
+      );
+      for (final c in components) {
+        if ((c.name.trim()).isEmpty) continue;
+        await tx.insert('set_components', {
+          'parent_product_id': parentSetProductId,
+          'name': c.name.trim(),
+          'qty': c.qty.clamp(1, 9999),
+          'variant': c.variant?.trim().isEmpty == true ? null : c.variant?.trim(),
+          'createdAtMs': now,
+        });
+      }
+    });
+  }
+
+  /// Shton stok për një SET: shton setsCount në stokun e vetë produktit SET (size 0 = numri i setave)
+  Future<void> addSetStock(int parentSetProductId, int setsCount) async {
+    if (setsCount <= 0) return;
+    final db = await DatabaseManager.getCurrentBusinessDb();
+    if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final rows = await db.query('products', where: 'id = ?', whereArgs: [parentSetProductId], limit: 1);
+    if (rows.isEmpty) throw Exception('Produkti SET nuk u gjet.');
+    final p0 = Product.fromRow(rows.first);
+    final map = Map<int, int>.from(p0.sizeStock);
+    const setSizeKey = 0; // size 0 = numri i setave
+    map[setSizeKey] = (map[setSizeKey] ?? 0) + setsCount;
+    final newTotal = _totalStock(map);
+    await db.update(
+      'products',
+      {'sizeStockJson': _encodeSizeStock(map), 'stockQty': newTotal, 'updatedAtMs': nowMs},
+      where: 'id = ?',
+      whereArgs: [parentSetProductId],
+    );
+  }
+
   Future<int> addProduct({
     required String name,
     String? sku,
@@ -1423,6 +1579,8 @@ class LocalApi {
     String? category,
     String? subcategory,
     bool autoGenerateVariants = true,
+    bool isSet = false,
+    List<SetComponent>? setComponents,
   }) async {
     final db = await DatabaseManager.getCurrentBusinessDb();
     if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
@@ -1447,11 +1605,25 @@ class LocalApi {
         'subcategory': subcategory?.trim().isEmpty == true
             ? null
             : subcategory?.trim(),
+        'is_set': isSet ? 1 : 0,
         'createdAtMs': now,
         'updatedAtMs': now,
       };
 
       final productId = await tx.insert('products', map);
+
+      if (isSet && (setComponents != null && setComponents.isNotEmpty)) {
+        for (final c in setComponents) {
+          if ((c.name.trim()).isEmpty) continue;
+          await tx.insert('set_components', {
+            'parent_product_id': productId,
+            'name': c.name.trim(),
+            'qty': c.qty.clamp(1, 9999),
+            'variant': c.variant?.trim().isEmpty == true ? null : c.variant?.trim(),
+            'createdAtMs': now,
+          });
+        }
+      }
 
       // Krijo variantet automatikisht nëse autoGenerateVariants = true
       if (autoGenerateVariants && (category != null || subcategory != null)) {
@@ -1508,6 +1680,8 @@ class LocalApi {
     String? category,
     String? subcategory,
     bool autoGenerateVariants = true,
+    bool isSet = false,
+    List<SetComponent>? setComponents,
   }) async {
     final db = await DatabaseManager.getCurrentBusinessDb();
     if (db == null) throw Exception('Nuk është zgjedhur asnjë biznes.');
@@ -1532,10 +1706,37 @@ class LocalApi {
         'subcategory': subcategory?.trim().isEmpty == true
             ? null
             : subcategory?.trim(),
+        'is_set': isSet ? 1 : 0,
         'updatedAtMs': now,
       };
 
       await tx.update('products', map, where: 'id = ?', whereArgs: [id]);
+
+      if (isSet) {
+        await tx.delete(
+          'set_components',
+          where: 'parent_product_id = ?',
+          whereArgs: [id],
+        );
+        if (setComponents != null && setComponents.isNotEmpty) {
+          for (final c in setComponents) {
+            if ((c.name.trim()).isEmpty) continue;
+            await tx.insert('set_components', {
+              'parent_product_id': id,
+              'name': c.name.trim(),
+              'qty': c.qty.clamp(1, 9999),
+              'variant': c.variant?.trim().isEmpty == true ? null : c.variant?.trim(),
+              'createdAtMs': now,
+            });
+          }
+        }
+      } else {
+        await tx.delete(
+          'set_components',
+          where: 'parent_product_id = ?',
+          whereArgs: [id],
+        );
+      }
 
       // Fshi variantet e vjetra dhe krijo të rejat
       if (autoGenerateVariants && (category != null || subcategory != null)) {
@@ -1728,9 +1929,52 @@ class LocalApi {
     return db.transaction((tx) async {
       double total = 0;
       double totalProfit = 0;
+      final splitSetQty = <int, int>{};
+      for (final item in cartItems) {
+        if (item.parentSetProductId != null && item.parentSetProductId == item.product.id) {
+          final pid = item.product.id;
+          final cur = splitSetQty[pid] ?? 0;
+          if (item.quantity > cur) splitSetQty[pid] = item.quantity;
+        }
+      }
 
       // Validate stock + totals
       for (final item in cartItems) {
+        if (item.soldAsSet) {
+          final prodRows = await tx.query(
+            'products',
+            where: 'id = ?',
+            whereArgs: [item.product.id],
+            limit: 1,
+          );
+          if (prodRows.isEmpty) {
+            throw Exception('Produkti SET nuk ekziston: ${item.product.name}');
+          }
+          final p0 = Product.fromRow(prodRows.first);
+          if (!p0.active) throw Exception('Ky produkt është OFF: ${item.product.name}');
+          const setSizeKey = 0; // stoku i setit = size 0
+          final q = p0.sizeStock[setSizeKey] ?? p0.stockQty;
+          if (q < item.quantity) {
+            throw Exception('Nuk ka stok për SET "${item.product.name}" (duhen ${item.quantity}, ka $q).');
+          }
+          total += item.lineTotal;
+          totalProfit += item.lineProfit;
+          continue;
+        }
+        if (item.parentSetProductId != null && item.parentSetProductId == item.product.id) {
+          final need = splitSetQty[item.product.id] ?? item.quantity;
+          final prodRows = await tx.query('products', where: 'id = ?', whereArgs: [item.product.id], limit: 1);
+          if (prodRows.isEmpty) throw Exception('Produkti SET nuk ekziston: ${item.product.name}');
+          final p0 = Product.fromRow(prodRows.first);
+          if (!p0.active) throw Exception('Ky produkt është OFF: ${item.product.name}');
+          const setSizeKey = 0;
+          final q = p0.sizeStock[setSizeKey] ?? p0.stockQty;
+          if (q < need) throw Exception('Nuk ka stok për SET "${item.product.name}" (duhen $need, ka $q).');
+          total += item.lineTotal;
+          totalProfit += item.lineProfit;
+          continue;
+        }
+
         final prodRows = await tx.query(
           'products',
           where: 'id = ?',
@@ -1757,8 +2001,49 @@ class LocalApi {
         totalProfit += item.lineProfit;
       }
 
+      final splitDeducted = <int>{};
       // Update stock
       for (final item in cartItems) {
+        if (item.soldAsSet) {
+          final prodRows = await tx.query(
+            'products',
+            where: 'id = ?',
+            whereArgs: [item.product.id],
+            limit: 1,
+          );
+          if (prodRows.isEmpty) continue;
+          final p0 = Product.fromRow(prodRows.first);
+          const setSizeKey = 0;
+          final map = Map<int, int>.from(p0.sizeStock);
+          map[setSizeKey] = (map[setSizeKey] ?? 0) - item.quantity;
+          final newTotal = _totalStock(map);
+          await tx.update(
+            'products',
+            {'sizeStockJson': _encodeSizeStock(map), 'stockQty': newTotal, 'updatedAtMs': nowMs},
+            where: 'id = ?',
+            whereArgs: [item.product.id],
+          );
+          continue;
+        }
+        if (item.parentSetProductId != null && item.parentSetProductId == item.product.id) {
+          if (splitDeducted.contains(item.product.id)) continue;
+          splitDeducted.add(item.product.id);
+          final deduct = splitSetQty[item.product.id] ?? item.quantity;
+          final prodRows = await tx.query('products', where: 'id = ?', whereArgs: [item.product.id], limit: 1);
+          if (prodRows.isEmpty) continue;
+          final p0 = Product.fromRow(prodRows.first);
+          const setSizeKey = 0;
+          final map = Map<int, int>.from(p0.sizeStock);
+          map[setSizeKey] = (map[setSizeKey] ?? 0) - deduct;
+          final newTotal = _totalStock(map);
+          await tx.update(
+            'products',
+            {'sizeStockJson': _encodeSizeStock(map), 'stockQty': newTotal, 'updatedAtMs': nowMs},
+            where: 'id = ?',
+            whereArgs: [item.product.id],
+          );
+          continue;
+        }
         // ✅ NEW: Nëse është variant, zbrit stokun te variant
         if (item.isVariant && item.variantId != null) {
           final variantRows = await tx.query(
@@ -1856,7 +2141,9 @@ class LocalApi {
         await tx.insert('sale_items', {
           'saleId': saleId,
           'productId': item.product.id,
-          'name': item.product.name,
+          'name': item.componentName != null && item.componentName!.isNotEmpty
+              ? '${item.product.name} - ${item.componentName}'
+              : item.product.name,
           'sku': item.product.sku,
           'serialNumber': item.product.serialNumber,
           'qty': item.quantity,

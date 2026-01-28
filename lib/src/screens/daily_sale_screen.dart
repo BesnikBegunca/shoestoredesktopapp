@@ -245,17 +245,38 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
 
         // Legacy: Shto produktin në shportë
         final product = foundProduct!;
-        final existingIndex = cart.indexWhere(
-          (item) =>
-              item.product.id == product.id &&
-              item.size == 0 &&
-              !item.isVariant,
-        );
-
-        if (existingIndex >= 0) {
-          setState(() => cart[existingIndex].quantity++);
+        if (product.isSet) {
+          final choice = await _showSetDecisionDialog(product);
+          if (!mounted) return;
+          if (choice == null) return;
+          if (choice == true) {
+            final existingIndex = cart.indexWhere(
+              (item) => item.product.id == product.id && item.soldAsSet,
+            );
+            if (existingIndex >= 0) {
+              setState(() => cart[existingIndex].quantity++);
+            } else {
+              setState(() => cart.add(CartItem(product: product, size: 0, soldAsSet: true)));
+            }
+          } else {
+            final splitItems = await _showSetSplitDialog(product);
+            if (!mounted) return;
+            if (splitItems != null && splitItems.isNotEmpty) {
+              setState(() => cart.addAll(splitItems));
+            }
+          }
         } else {
-          setState(() => cart.add(CartItem(product: product, size: 0)));
+          final existingIndex = cart.indexWhere(
+            (item) =>
+                item.product.id == product.id &&
+                item.size == 0 &&
+                !item.isVariant,
+          );
+          if (existingIndex >= 0) {
+            setState(() => cart[existingIndex].quantity++);
+          } else {
+            setState(() => cart.add(CartItem(product: product, size: 0)));
+          }
         }
       } else if (variants.length == 1) {
         // ✅ Vetëm 1 variant -> shtoje direkt
@@ -286,39 +307,59 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
           return;
         }
 
-        // Shto në cart
-        final sizeInt = int.tryParse(variant.size) ?? 0;
-        final existingIndex = cart.indexWhere(
-          (item) => item.isVariant && item.variantId == variant.id,
-        );
-
-        if (existingIndex >= 0) {
-          // Kontrollo stokun para se të rritesh sasinë
-          if (cart[existingIndex].quantity >= variant.quantity) {
+        // Nëse produkti është SET, shfaq dialog
+        if (product.isSet) {
+          final choice = await _showSetDecisionDialog(product);
+          if (!mounted) return;
+          if (choice == null) return;
+          if (choice == true) {
+            final existingIndex = cart.indexWhere(
+              (item) => item.product.id == product.id && item.soldAsSet,
+            );
+            if (existingIndex >= 0) {
+              setState(() => cart[existingIndex].quantity++);
+            } else {
+              setState(() => cart.add(CartItem(product: product, size: 0, soldAsSet: true)));
+            }
+          } else {
+            final splitItems = await _showSetSplitDialog(product);
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Stoku maksimal për ${formatSizeLabel(int.tryParse(variant.size) ?? 0)} është ${variant.quantity}',
+            if (splitItems != null && splitItems.isNotEmpty) {
+              setState(() => cart.addAll(splitItems));
+            }
+          }
+        } else {
+          final sizeInt = int.tryParse(variant.size) ?? 0;
+          final existingIndex = cart.indexWhere(
+            (item) => item.isVariant && item.variantId == variant.id,
+          );
+          if (existingIndex >= 0) {
+            if (cart[existingIndex].quantity >= variant.quantity) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Stoku maksimal për ${formatSizeLabel(sizeInt)} është ${variant.quantity}',
+                  ),
+                  backgroundColor: Colors.orange,
                 ),
-                backgroundColor: Colors.orange,
+              );
+              return;
+            }
+            setState(() => cart[existingIndex].quantity++);
+          } else {
+            setState(
+              () => cart.add(
+                CartItem(
+                  product: product,
+                  size: sizeInt,
+                  variantId: variant.id,
+                  variantSku: variant.sku,
+                  variantSize: variant.size,
+                ),
               ),
             );
-            return;
           }
-          setState(() => cart[existingIndex].quantity++);
-        } else {
-          setState(
-            () => cart.add(
-              CartItem(
-                product: product,
-                size: sizeInt,
-                variantId: variant.id,
-                variantSku: variant.sku,
-                variantSize: variant.size,
-              ),
-            ),
-          );
         }
       } else {
         // ✅ Më shumë se 1 variant -> shfaq zgjedhje mase
@@ -349,37 +390,58 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
           return;
         }
 
-        // Shto në cart
-        final sizeInt = int.tryParse(variant.size) ?? 0;
-        final existingIndex = cart.indexWhere(
-          (item) => item.isVariant && item.variantId == variant.id,
-        );
-
-        if (existingIndex >= 0) {
-          if (cart[existingIndex].quantity >= variant.quantity) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Stoku maksimal për ${variant.size} është ${variant.quantity}',
+        // Nëse produkti është SET, shfaq dialog
+        if (product.isSet) {
+          final choice = await _showSetDecisionDialog(product);
+          if (!mounted) return;
+          if (choice == null) return;
+          if (choice == true) {
+            final existingIndex = cart.indexWhere(
+              (item) => item.product.id == product.id && item.soldAsSet,
+            );
+            if (existingIndex >= 0) {
+              setState(() => cart[existingIndex].quantity++);
+            } else {
+              setState(() => cart.add(CartItem(product: product, size: 0, soldAsSet: true)));
+            }
+          } else {
+            final splitItems = await _showSetSplitDialog(product);
+            if (!mounted) return;
+            if (splitItems != null && splitItems.isNotEmpty) {
+              setState(() => cart.addAll(splitItems));
+            }
+          }
+        } else {
+          final sizeInt = int.tryParse(variant.size) ?? 0;
+          final existingIndex = cart.indexWhere(
+            (item) => item.isVariant && item.variantId == variant.id,
+          );
+          if (existingIndex >= 0) {
+            if (cart[existingIndex].quantity >= variant.quantity) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Stoku maksimal për ${variant.size} është ${variant.quantity}',
+                  ),
+                  backgroundColor: Colors.orange,
                 ),
-                backgroundColor: Colors.orange,
+              );
+              return;
+            }
+            setState(() => cart[existingIndex].quantity++);
+          } else {
+            setState(
+              () => cart.add(
+                CartItem(
+                  product: product,
+                  size: sizeInt,
+                  variantId: variant.id,
+                  variantSku: variant.sku,
+                  variantSize: variant.size,
+                ),
               ),
             );
-            return;
           }
-          setState(() => cart[existingIndex].quantity++);
-        } else {
-          setState(
-            () => cart.add(
-              CartItem(
-                product: product,
-                size: sizeInt,
-                variantId: variant.id,
-                variantSku: variant.sku,
-                variantSize: variant.size,
-              ),
-            ),
-          );
         }
       }
 
@@ -399,6 +461,164 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
     } finally {
       if (mounted) setState(() => processing = false);
     }
+  }
+
+  /// Dialog: Produkti është SET – shit si SET ose nda SET-in.
+  /// Returns: true = shit si SET, false = nda SET-in, null = anulo
+  Future<bool?> _showSetDecisionDialog(Product setProduct) async {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Produkti është SET'),
+        content: const Text(
+          'Dëshiron ta ndash setin?',
+          style: TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Po, nda SET-in'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Jo, shit si SET'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Dialog: Ndaje SET-in – shfaq komponentët (emër, sasi, variant) dhe shton linja shportë për çdo komponent.
+  /// Returns list of CartItem (one per component) or null if cancelled.
+  Future<List<CartItem>?> _showSetSplitDialog(Product setProduct) async {
+    final components = await LocalApi.I.getSetComponents(setProduct.id);
+    if (components.isEmpty) {
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ky SET nuk ka komponentë të konfiguruar.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return null;
+    }
+
+    final qtyControllers = <int, TextEditingController>{};
+    for (int i = 0; i < components.length; i++) {
+      qtyControllers[i] = TextEditingController(text: '${components[i].qty}');
+    }
+
+    List<CartItem>? result;
+    final errorHolder = <String?>[null];
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('Ndaje SET-in'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (errorHolder[0] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          errorHolder[0]!,
+                          style: const TextStyle(color: Colors.red, fontSize: 14),
+                        ),
+                      ),
+                    ...List.generate(components.length, (i) {
+                      final c = components[i];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                c.name.isEmpty ? 'Komponent ${i + 1}' : c.name,
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            if (c.variant != null && c.variant!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Text('(${c.variant})', style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+                              ),
+                            SizedBox(
+                              width: 90,
+                              child: TextField(
+                                controller: qtyControllers[i],
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Sasia',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                onChanged: (_) => setDialogState(() {}),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Anulo'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    errorHolder[0] = null;
+                    final items = <CartItem>[];
+                    int maxQty = 0;
+                    for (int i = 0; i < components.length; i++) {
+                      final c = components[i];
+                      final qty = int.tryParse(qtyControllers[i]!.text.trim()) ?? c.qty;
+                      if (qty <= 0) {
+                        errorHolder[0] = 'Sasia për "${c.name}" duhet > 0.';
+                        setDialogState(() {});
+                        return;
+                      }
+                      if (qty > maxQty) maxQty = qty;
+                      items.add(CartItem(
+                        product: setProduct,
+                        size: 0,
+                        quantity: qty,
+                        parentSetProductId: setProduct.id,
+                        componentName: c.name.isEmpty ? null : c.name,
+                      ));
+                    }
+                    final setStock = setProduct.sizeStock[0] ?? setProduct.stockQty;
+                    if (setStock < maxQty) {
+                      errorHolder[0] = 'Nuk ka stok për SET (duhen $maxQty seta, ka $setStock).';
+                      setDialogState(() {});
+                      return;
+                    }
+                    result = items;
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
+                  child: const Text('Konfirmo'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    for (final c in qtyControllers.values) {
+      c.dispose();
+    }
+    return result;
   }
 
   // ✅ NEW: Shfaq dialog për zgjedhje mase
@@ -1601,7 +1821,9 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Text(
-                                                item.product.name,
+                                                item.componentName != null && item.componentName!.isNotEmpty
+                                                    ? '${item.product.name} - ${item.componentName}'
+                                                    : '${item.product.name}${item.soldAsSet ? ' (SET)' : ''}',
                                                 style: const TextStyle(
                                                   fontWeight: FontWeight.w600,
                                                   fontSize: 15,

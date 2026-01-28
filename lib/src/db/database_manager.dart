@@ -15,7 +15,7 @@ class DatabaseManager {
   static bool _isInitialized = false;
   
   static const int kAdminDbVersion = 1;
-  static const int kBusinessDbVersion = 13; // Added business_category_sizes table
+  static const int kBusinessDbVersion = 15; // set_components: name, qty, variant (inline, no child_product_id)
   
   /// Inicializo sqflite FFI në mënyrë të sigurt (vetëm një herë)
   /// Ky funksion mund të përdoret nga çdo vend në aplikacion
@@ -239,8 +239,22 @@ class DatabaseManager {
         sizeStockJson TEXT,
         category TEXT,
         subcategory TEXT,
+        is_set INTEGER NOT NULL DEFAULT 0,
         createdAtMs INTEGER,
         updatedAtMs INTEGER
+      )
+    ''');
+    
+    // Set components (për produktet SET / bundle) – komponentë inline (emër, sasi, variant)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS set_components (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        parent_product_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        qty INTEGER NOT NULL DEFAULT 1,
+        variant TEXT,
+        createdAtMs INTEGER,
+        FOREIGN KEY (parent_product_id) REFERENCES products(id) ON DELETE CASCADE
       )
     ''');
     
@@ -427,6 +441,40 @@ class DatabaseManager {
             createdAtMs INTEGER NOT NULL,
             FOREIGN KEY (categoryId) REFERENCES business_categories(id) ON DELETE CASCADE,
             UNIQUE(categoryId, sizeValue)
+          )
+        ''');
+      } catch (_) {}
+    }
+    if (oldVersion < 14) {
+      try {
+        await db.execute('ALTER TABLE products ADD COLUMN is_set INTEGER NOT NULL DEFAULT 0');
+      } catch (_) {}
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS set_components (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_product_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            qty INTEGER NOT NULL DEFAULT 1,
+            variant TEXT,
+            createdAtMs INTEGER,
+            FOREIGN KEY (parent_product_id) REFERENCES products(id) ON DELETE CASCADE
+          )
+        ''');
+      } catch (_) {}
+    }
+    if (oldVersion < 15) {
+      try {
+        await db.execute('DROP TABLE IF EXISTS set_components');
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS set_components (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_product_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            qty INTEGER NOT NULL DEFAULT 1,
+            variant TEXT,
+            createdAtMs INTEGER,
+            FOREIGN KEY (parent_product_id) REFERENCES products(id) ON DELETE CASCADE
           )
         ''');
       } catch (_) {}

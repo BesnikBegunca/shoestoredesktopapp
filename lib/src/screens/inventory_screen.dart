@@ -1232,22 +1232,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          // Është SET
-                          Row(
-                            children: [
-                              Checkbox(
-                                value: isSet,
-                                onChanged: (v) {
-                                  setState(() {
-                                    isSet = v ?? false;
-                                    if (!isSet) setComponents = [];
-                                  });
-                                },
-                              ),
-                              const Text('Është SET (bundle me komponentë)', style: TextStyle(fontWeight: FontWeight.w600)),
-                            ],
-                          ),
                           if (isSet) ...[
                             const SizedBox(height: 12),
                             _buildSetComponentsEditor(),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
 import 'package:intl/intl.dart';
 
 import '../local/local_api.dart';
@@ -169,18 +171,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: 'Shitje Sot',
             value: _formatCurrency(stats.totalSalesToday),
             subtitle: '${stats.countSalesToday} transaksione',
-            icon: Icons.shopping_cart,
+            icon: SvgPicture.asset(
+              'assets/icons/cart.svg',
+              width: 24,
+              height: 24,
+              colorFilter: const ColorFilter.mode(Colors.blue, BlendMode.srcIn),
+            ),
             color: Colors.blue,
             trend: stats.totalSalesToday > 0 ? '+' : '',
           ),
         ),
+
         const SizedBox(width: 16),
         Expanded(
           child: _statsCard(
             title: 'Fitimi Sot',
             value: _formatCurrency(stats.totalProfitToday),
             subtitle: 'Profit i ditës',
-            icon: Icons.trending_up,
+            icon: Icon(Icons.trending_up, color: Colors.green, size: 24),
             color: Colors.green,
             trend: stats.totalProfitToday > 0 ? '+' : '',
           ),
@@ -191,7 +199,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: 'Shitje Muaji',
             value: _formatCurrency(stats.totalSalesMonth),
             subtitle: '${stats.countSalesMonth} transaksione',
-            icon: Icons.calendar_month,
+            icon: Icon(Icons.calendar_month, color: Colors.purple, size: 24),
             color: Colors.purple,
             trend: '',
           ),
@@ -202,7 +210,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: 'Totali',
             value: _formatCurrency(stats.totalSalesAll),
             subtitle: '${stats.countSalesAll} total',
-            icon: Icons.account_balance_wallet,
+            icon: Icon(
+              Icons.account_balance_wallet,
+              color: Colors.orange,
+              size: 24,
+            ),
             color: Colors.orange,
             trend: '',
           ),
@@ -215,7 +227,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required String title,
     required String value,
     required String subtitle,
-    required IconData icon,
+    required Widget icon,
     required Color color,
     required String trend,
   }) {
@@ -244,7 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: color, size: 24),
+                child: icon,
               ),
               const Spacer(),
               if (trend.isNotEmpty)

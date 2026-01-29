@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shoe_store_manager/auth/role_store.dart';
@@ -24,6 +25,92 @@ enum _NavSection {
   shpenzimet, 
   licenca, 
   help 
+}
+
+/// Fjalëkalimi për hyrje te Fitimet dhe Shpenzimet
+const String _protectedSectionsPassword = 'superadmin123';
+
+/// Dialogu i fjalëkalimit; posedon TextEditingController që fshihet kur route hiqet.
+class _PasswordDialogBody extends StatefulWidget {
+  final _NavSection section;
+  final String expectedPassword;
+
+  const _PasswordDialogBody({
+    required this.section,
+    required this.expectedPassword,
+  });
+
+  @override
+  State<_PasswordDialogBody> createState() => _PasswordDialogBodyState();
+}
+
+class _PasswordDialogBodyState extends State<_PasswordDialogBody> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final section = widget.section;
+    final expectedPassword = widget.expectedPassword;
+    return AlertDialog(
+      title: const Text('Fjalëkalim'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            section == _NavSection.fitimet
+                ? 'Vendosni fjalëkalimin për të hyrë te Fitimet.'
+                : 'Vendosni fjalëkalimin për të hyrë te Shpenzimet.',
+            style: const TextStyle(fontSize: 14),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Fjalëkalimi',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (value) {
+              if (value == expectedPassword) {
+                Navigator.pop(context, true);
+              } else {
+                Navigator.pop(context, false);
+              }
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Anulo'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_controller.text == expectedPassword) {
+              Navigator.pop(context, true);
+            } else {
+              Navigator.pop(context, false);
+            }
+          },
+          child: const Text('Hyr'),
+        ),
+      ],
+    );
+  }
 }
 
 class AppShell extends StatefulWidget {
@@ -209,6 +296,46 @@ class _AppShellState extends State<AppShell> {
               ),
             ),
 
+            // Close button - Fixed at bottom
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: _closeApp,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                  child: Row(
+                    children: [
+                      SvgPicture.asset(
+                        'assets/icons/logout.svg',
+                        width: 20,
+                        height: 20,
+                        colorFilter: const ColorFilter.mode(
+                          Colors.red,
+                          BlendMode.srcIn,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Mbyll',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
             // Logout button - Fixed at bottom
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -255,6 +382,33 @@ class _AppShellState extends State<AppShell> {
   }
 
 
+  // ================= CLOSE APP =================
+  Future<void> _closeApp() async {
+    final shouldClose = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Close App'),
+          content: const Text('Are you sure you want to close this app?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldClose ?? false) {
+      exit(0);
+    }
+  }
+
   // ================= LOGOUT =================
   Future<void> _logout() async {
     await RoleStore.clear();
@@ -264,6 +418,35 @@ class _AppShellState extends State<AppShell> {
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (_) => false,
     );
+  }
+
+  /// Navigon te seksioni; për Fitimet dhe Shpenzimet kërkon fjalëkalim.
+  Future<void> _navigateToSection(_NavSection section) async {
+    final needsPassword = section == _NavSection.fitimet || section == _NavSection.shpenzimet;
+    if (!needsPassword) {
+      setState(() => this.section = section);
+      return;
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _PasswordDialogBody(
+        section: section,
+        expectedPassword: _protectedSectionsPassword,
+      ),
+    );
+
+    if (mounted && (result == true)) {
+      setState(() => this.section = section);
+    } else if (mounted && result == false) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Fjalëkalimi është i gabuar.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   // ================= NAV ITEM WITH SVG =================
@@ -278,7 +461,7 @@ class _AppShellState extends State<AppShell> {
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => setState(() => this.section = section),
+        onTap: () => _navigateToSection(section),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(

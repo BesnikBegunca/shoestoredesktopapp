@@ -49,6 +49,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   bool active = true;
   bool saving = false;
+  bool isSet = false;
+  List<SetComponent> setComponents = [];
+  int _setStockCount = 1; // numri i setave për "Shto sipas setave"
+  bool _setStockApplying = false;
+  int _setStockDisplay = 0; // stoku i setave (përditësohet pas Apliko)
 
   static const int minSize = 17;
   static const int maxSize = 30;
@@ -234,6 +239,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
           text: (existing[_clothKey(i)] ?? 0).toString(),
         ),
     };
+    isSet = p0?.isSet ?? false;
+    _setStockDisplay = p0?.sizeStock[0] ?? p0?.stockQty ?? 0;
+    if (isSet && p0 != null) {
+      LocalApi.I.getSetComponents(p0.id).then((list) {
+        if (mounted) setState(() => setComponents = list);
+      });
+    }
   }
 
   @override
@@ -486,7 +498,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
       }
     }
 
-    if (total <= 0) {
+    if (isSet) {
+      final valid = setComponents.where((c) => (c.name.trim()).isNotEmpty).toList();
+      if (valid.isEmpty) {
+        _snack('Kur është SET, duhet të paktën 1 komponent me emër.');
+        return;
+      }
+      for (final c in valid) {
+        if (c.qty < 1) {
+          _snack('Sasia për "${c.name}" duhet të jetë >= 1.');
+          return;
+        }
+      }
+    }
+    if (!isSet && total <= 0) {
       _snack('Duhet me pas të paktën 1 copë në stok (në ndonjë masë).');
       return;
     }
@@ -505,6 +530,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       final editing = widget.editing;
 
       if (editing == null) {
+        final components = isSet ? setComponents.where((c) => (c.name.trim()).isNotEmpty).toList() : null;
         final productId = await LocalApi.I.addProduct(
           name: name,
           sku: null, // SKU gjenerohet automatikisht për variantet
@@ -517,7 +543,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
           sizeStock: sizeStock,
           category: category,
           subcategory: subcategory,
-          autoGenerateVariants: true,
+          autoGenerateVariants: !isSet,
+          isSet: isSet,
+          setComponents: components,
         );
         
         // ✅ Krijo automatikisht shpenzim "Blerje Malli" nëse Çmimi i Blerjes > 0
@@ -566,6 +594,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           await _deleteIfAppImage(old);
         }
 
+        final components = isSet ? setComponents.where((c) => (c.name.trim()).isNotEmpty).toList() : null;
         await LocalApi.I.updateProduct(
           id: editing.id,
           name: name,
@@ -579,7 +608,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
           sizeStock: sizeStock,
           category: category,
           subcategory: subcategory,
-          autoGenerateVariants: true,
+          autoGenerateVariants: !isSet,
+          isSet: isSet,
+          setComponents: components,
         );
         _snack('Produkti u përditësua me sukses ✅');
       }
@@ -591,6 +622,168 @@ class _InventoryScreenState extends State<InventoryScreen> {
       setState(() => saving = false);
       _snack('Gabim: $e');
     }
+  }
+
+  Widget _buildSetComponentsEditor() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.black87.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Komponentët e SET-it',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Colors.black87),
+          ),
+          const SizedBox(height: 12),
+          ...setComponents.asMap().entries.map((e) {
+            final i = e.key;
+            final c = e.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      key: ValueKey('name-$i-${c.name}'),
+                      decoration: const InputDecoration(
+                        labelText: 'Emri i komponentit',
+                        hintText: 'p.sh. Bluzë, Pantallona, 0-3M pjesa 1',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
+                      initialValue: c.name,
+                      onChanged: (v) {
+                        setState(() {
+                          setComponents = List.from(setComponents);
+                          setComponents[i] = SetComponent(parentSetProductId: c.parentSetProductId, name: v.trim(), qty: c.qty, variant: c.variant);
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 70,
+                    child: TextFormField(
+                      key: ValueKey('qty-$i-${c.qty}'),
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Sasia', isDense: true, border: OutlineInputBorder()),
+                      initialValue: '${c.qty}',
+                      onChanged: (v) {
+                        final q = int.tryParse(v.trim()) ?? 1;
+                        setState(() {
+                          setComponents = List.from(setComponents);
+                          setComponents[i] = SetComponent(parentSetProductId: c.parentSetProductId, name: c.name, qty: q.clamp(1, 999), variant: c.variant);
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 90,
+                    child: TextFormField(
+                      key: ValueKey('variant-$i-${c.variant}'),
+                      decoration: const InputDecoration(labelText: 'Masa/Varianti', isDense: true, border: OutlineInputBorder()),
+                      initialValue: c.variant ?? '',
+                      onChanged: (v) {
+                        setState(() {
+                          setComponents = List.from(setComponents);
+                          setComponents[i] = SetComponent(parentSetProductId: c.parentSetProductId, name: c.name, qty: c.qty, variant: v.trim().isEmpty ? null : v.trim());
+                        });
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: () => setState(() => setComponents = List.from(setComponents)..removeAt(i)),
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => setState(() => setComponents = List.from(setComponents)..add(SetComponent(parentSetProductId: widget.editing?.id ?? 0, name: '', qty: 1))),
+            icon: const Icon(Icons.add),
+            label: const Text('+ Shto komponent'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSetStockPanel() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.black87.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Set Stock',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: Colors.black87),
+          ),
+          const Text('Stoku sipas setave', style: TextStyle(fontSize: 14, color: Colors.black54)),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Text('Shto sipas numrit të setave:', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(width: 12),
+              IconButton.filled(
+                icon: const Icon(Icons.remove),
+                onPressed: _setStockCount > 1 ? () => setState(() => _setStockCount--) : null,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text('$_setStockCount', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              ),
+              IconButton.filled(
+                icon: const Icon(Icons.add),
+                onPressed: () => setState(() => _setStockCount++),
+              ),
+              const SizedBox(width: 16),
+              FilledButton(
+                onPressed: _setStockApplying ? null : () async {
+                  setState(() => _setStockApplying = true);
+                  try {
+                    await LocalApi.I.addSetStock(widget.editing!.id, _setStockCount);
+                    if (mounted) setState(() => _setStockDisplay += _setStockCount);
+                  } catch (e) {
+                    if (mounted) _snack('Gabim: $e');
+                  } finally {
+                    if (mounted) setState(() => _setStockApplying = false);
+                  }
+                },
+                child: Text(_setStockApplying ? 'Duke aplikuar...' : 'Apliko'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.black87.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.black87.withOpacity(0.2)),
+            ),
+            child: Text(
+              'Stoku aktual: $_setStockDisplay seta',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildPanel({required String title, required List<Widget> children}) {
@@ -1039,15 +1232,39 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 20),
-                          // Stock by Sizes
-                          _buildPanel(
-                            title: 'Stock by Sizes',
+                          const SizedBox(height: 16),
+                          // Është SET
+                          Row(
                             children: [
-                              Row(
-                                children: [
-                                  const Text(
-                                    'Stoku sipas masave',
+                              Checkbox(
+                                value: isSet,
+                                onChanged: (v) {
+                                  setState(() {
+                                    isSet = v ?? false;
+                                    if (!isSet) setComponents = [];
+                                  });
+                                },
+                              ),
+                              const Text('Është SET (bundle me komponentë)', style: TextStyle(fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                          if (isSet) ...[
+                            const SizedBox(height: 12),
+                            _buildSetComponentsEditor(),
+                            const SizedBox(height: 12),
+                          ],
+                          const SizedBox(height: 20),
+                          // Stock by Sizes OSE Set Stock
+                          if (isSet && widget.editing != null && setComponents.isNotEmpty)
+                            _buildSetStockPanel()
+                          else if (!isSet)
+                            _buildPanel(
+                              title: 'Stock by Sizes',
+                              children: [
+                                Row(
+                                  children: [
+                                    const Text(
+                                      'Stoku sipas masave',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w900,
                                       color: Colors.black87,

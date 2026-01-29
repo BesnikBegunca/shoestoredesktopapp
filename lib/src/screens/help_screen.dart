@@ -14,115 +14,140 @@ class _HelpScreenState extends State<HelpScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // ✅ Categories: përdor SVG path, jo IconData
   final List<Map<String, dynamic>> _categories = [
-    {'id': 'all', 'label': 'Të gjitha', 'icon': Icons.apps},
-    {'id': 'shitja', 'label': 'Shitja', 'icon': Icons.point_of_sale},
-    {'id': 'stoku', 'label': 'Stoku', 'icon': Icons.inventory},
-    {'id': 'fitimet', 'label': 'Fitimet', 'icon': Icons.trending_up},
-    {'id': 'shpenzimet', 'label': 'Shpenzimet', 'icon': Icons.money_off},
-    {'id': 'licenca', 'label': 'Licenca', 'icon': Icons.vpn_key},
+    {'id': 'all', 'label': 'Të gjitha', 'svg': 'assets/icons/allc.svg'},
+    {'id': 'shitja', 'label': 'Shitja', 'svg': 'assets/icons/soldtoday.svg'},
+    {'id': 'stoku', 'label': 'Stoku', 'svg': 'assets/icons/inv.svg'},
+    {'id': 'fitimet', 'label': 'Fitimet', 'svg': 'assets/icons/fitimi.svg'},
+    {
+      'id': 'shpenzimet',
+      'label': 'Shpenzimet',
+      'svg': 'assets/icons/expenses.svg',
+    },
+    {'id': 'licenca', 'label': 'Licenca', 'svg': 'assets/icons/key.svg'},
   ];
 
   final List<Map<String, dynamic>> _faqs = [
     {
       'category': 'shitja',
       'question': 'Si të bëj një shitje?',
-      'answer': 'Për të bërë një shitje, shkoni në "Shitja Ditore", skanoni barcode-in e produktit ose kërkoni produktin manualisht. Shtoni sasitë dhe klikoni "Paguaj" për të përfunduar transaksionin.',
+      'answer':
+          'Për të bërë një shitje, shkoni në "Shitja Ditore", skanoni barcode-in e produktit ose kërkoni produktin manualisht. Shtoni sasitë dhe klikoni "Paguaj" për të përfunduar transaksionin.',
     },
     {
       'category': 'shitja',
       'question': 'Si të printoj faturën?',
-      'answer': 'Pas përfundimit të shitjes, klikoni butonin e printimit në ekranin e konfirmimit. Faturat printohen automatikisht në format 80mm për printerë POS.',
+      'answer':
+          'Pas përfundimit të shitjes, klikoni butonin e printimit në ekranin e konfirmimit. Faturat printohen automatikisht në format 80mm për printerë POS.',
     },
     {
       'category': 'shitja',
       'question': 'Si të anuloj një shitje?',
-      'answer': 'Nëse shitja është bërë gabimisht, mund ta anuloni nga historiku i shitjeve. Kjo do të rikthejë stokun automatikisht.',
+      'answer':
+          'Nëse shitja është bërë gabimisht, mund ta anuloni nga historiku i shitjeve. Kjo do të rikthejë stokun automatikisht.',
     },
     {
       'category': 'stoku',
       'question': 'Si të regjistoj produkte të reja?',
-      'answer': 'Shkoni në "Regjistrimi i Mallit", klikoni "Shto Produkt", plotësoni të dhënat (emri, çmimi, barcode, etj.) dhe ruani. Mund të shtoni edhe foto të produktit.',
+      'answer':
+          'Shkoni në "Regjistrimi i Mallit", klikoni "Shto Produkt", plotësoni të dhënat (emri, çmimi, barcode, etj.) dhe ruani. Mund të shtoni edhe foto të produktit.',
     },
     {
       'category': 'stoku',
       'question': 'Si të menaxhoj stokun?',
-      'answer': 'Në seksionin "Stoku" mund të shihni të gjithë inventarin, të filtroni produktet sipas kategorive, dhe të shihni cilat produkte kanë stok të ulët.',
+      'answer':
+          'Në seksionin "Stoku" mund të shihni të gjithë inventarin, të filtroni produktet sipas kategorive, dhe të shihni cilat produkte kanë stok të ulët.',
     },
     {
       'category': 'stoku',
       'question': 'Çfarë ndodh kur një produkt mbaron nga stoku?',
-      'answer': 'Sistemi ju paralajmëron automatikisht kur një produkt ka stok të ulët (< 5 copë). Produktet pa stok nuk mund të shiten derisa të rifreskoni inventarin.',
+      'answer':
+          'Sistemi ju paralajmëron automatikisht kur një produkt ka stok të ulët (< 5 copë). Produktet pa stok nuk mund të shiten derisa të rifreskoni inventarin.',
     },
     {
       'category': 'stoku',
       'question': 'Si të shtoj sasi të re në stok?',
-      'answer': 'Shkoni te produkti në "Regjistrimi i Mallit", klikoni Edit, dhe përditësoni sasinë e stokut. Sistemi do ta ruajë historikun e ndryshimeve.',
+      'answer':
+          'Shkoni te produkti në "Regjistrimi i Mallit", klikoni Edit, dhe përditësoni sasinë e stokut. Sistemi do ta ruajë historikun e ndryshimeve.',
     },
     {
       'category': 'fitimet',
       'question': 'Si të shoh fitimet e ditës?',
-      'answer': 'Shkoni në "Fitimet", zgjidhni filtrin "Ditor" dhe do të shihni të gjitha shitjet, fitimin bruto, shpenzimet dhe fitimin neto për ditën e sotme.',
+      'answer':
+          'Shkoni në "Fitimet", zgjidhni filtrin "Ditor" dhe do të shihni të gjitha shitjet, fitimin bruto, shpenzimet dhe fitimin neto për ditën e sotme.',
     },
     {
       'category': 'fitimet',
       'question': 'Si llogaritet fitimi?',
-      'answer': 'Fitimi bruto = Shitje Totale - Çmimi i Blerjes. Fitimi neto = Fitimi Bruto - Shpenzimet. Sistemi llogarit automatikisht bazuar në çmimet e blerjes dhe shitjes.',
+      'answer':
+          'Fitimi bruto = Shitje Totale - Çmimi i Blerjes. Fitimi neto = Fitimi Bruto - Shpenzimet. Sistemi llogarit automatikisht bazuar në çmimet e blerjes dhe shitjes.',
     },
     {
       'category': 'fitimet',
       'question': 'Si të printoj raportin e fitimeve?',
-      'answer': 'Klikoni butonin e printimit në ekranin "Fitimet". Mund të zgjidhni periudhën (ditor, javor, mujor) para se të printoni raportin.',
+      'answer':
+          'Klikoni butonin e printimit në ekranin "Fitimet". Mund të zgjidhni periudhën (ditor, javor, mujor) para se të printoni raportin.',
     },
     {
       'category': 'shpenzimet',
       'question': 'Si të regjistoj shpenzime?',
-      'answer': 'Shkoni në "Shpenzimet", klikoni butonin "+", zgjidhni kategorinë (Rryma, Uji, Qiraja, etj.), vendosni shumën dhe shënimin, pastaj klikoni "Shto".',
+      'answer':
+          'Shkoni në "Shpenzimet", klikoni butonin "+", zgjidhni kategorinë (Rryma, Uji, Qiraja, etj.), vendosni shumën dhe shënimin, pastaj klikoni "Shto".',
     },
     {
       'category': 'shpenzimet',
       'question': 'Çfarë janë "Blerje Malli"?',
-      'answer': '"Blerje Malli" janë investimet për blerjen e produkteve të reja për shitje. Këto regjistrohen automatikisht nga sistemi dhe ndikojnë në fitimin neto.',
+      'answer':
+          '"Blerje Malli" janë investimet për blerjen e produkteve të reja për shitje. Këto regjistrohen automatikisht nga sistemi dhe ndikojnë në fitimin neto.',
     },
     {
       'category': 'shpenzimet',
       'question': 'Si të filtoj shpenzimet sipas kategorisë?',
-      'answer': 'Në ekranin "Shpenzimet", përdorni chips-at e kategorive për të filtruar. Mund të zgjidhni "Të gjitha" ose kategori specifike si Rryma, Uji, Qiraja, etj.',
+      'answer':
+          'Në ekranin "Shpenzimet", përdorni chips-at e kategorive për të filtruar. Mund të zgjidhni "Të gjitha" ose kategori specifike si Rryma, Uji, Qiraja, etj.',
     },
     {
       'category': 'licenca',
       'question': 'Si funksionon licenca?',
-      'answer': 'Aplikacioni kërkon një licencë aktive për të funksionuar. Licenca aktivizohet me një kod unik që merret nga administratori ose zhvilluesi.',
+      'answer':
+          'Aplikacioni kërkon një licencë aktive për të funksionuar. Licenca aktivizohet me një kod unik që merret nga administratori ose zhvilluesi.',
     },
     {
       'category': 'licenca',
       'question': 'Çfarë ndodh nëse licenca skadon?',
-      'answer': 'Nëse licenca skadon, aplikacioni do të kalojë në modalitet "readonly" ku mund të shikoni të dhënat por nuk mund të bëni shitje ose ndryshime.',
+      'answer':
+          'Nëse licenca skadon, aplikacioni do të kalojë në modalitet "readonly" ku mund të shikoni të dhënat por nuk mund të bëni shitje ose ndryshime.',
     },
     {
       'category': 'licenca',
       'question': 'Si të rinovojë licencën?',
-      'answer': 'Kontaktoni administratorin ose zhvilluesin për të marrë një kod rinovimi. Vendosni kodin në seksionin "Licenca" për të aktivizuar përsëri aplikacionin.',
+      'answer':
+          'Kontaktoni administratorin ose zhvilluesin për të marrë një kod rinovimi. Vendosni kodin në seksionin "Licenca" për të aktivizuar përsëri aplikacionin.',
     },
     {
       'category': 'shitja',
       'question': 'Si të përdor skanerin e barcode?',
-      'answer': 'Lidhni një skaner barcode USB me kompjuterin. Në ekranin "Shitja Ditore", fokusoni në fushën e kërkimit dhe skanoni produktin. Sistemi do ta gjejë dhe shtojë automatikisht.',
+      'answer':
+          'Lidhni një skaner barcode USB me kompjuterin. Në ekranin "Shitja Ditore", fokusoni në fushën e kërkimit dhe skanoni produktin. Sistemi do ta gjejë dhe shtojë automatikisht.',
     },
     {
       'category': 'stoku',
       'question': 'Si të fshij një produkt?',
-      'answer': 'Shkoni te "Regjistrimi i Mallit", gjeni produktin, dhe klikoni ikonën e fshirjes në fund të rreshtit. Do të shfaqet një konfirmim para se të fshihet përfundimisht.',
+      'answer':
+          'Shkoni te "Regjistrimi i Mallit", gjeni produktin, dhe klikoni ikonën e fshirjes në fund të rreshtit. Do të shfaqet një konfirmim para se të fshihet përfundimisht.',
     },
     {
       'category': 'fitimet',
       'question': 'A mund të shoh fitimet për një periudhë specifike?',
-      'answer': 'Po! Në ekranin "Fitimet" mund të zgjidhni ndërmjet tre periudhave: Ditor (sot), Javor (7 ditët e fundit), dhe Mujor (muaji aktual).',
+      'answer':
+          'Po! Në ekranin "Fitimet" mund të zgjidhni ndërmjet tre periudhave: Ditor (sot), Javor (7 ditët e fundit), dhe Mujor (muaji aktual).',
     },
     {
       'category': 'shpenzimet',
       'question': 'Si të printoj raportin e shpenzimeve?',
-      'answer': 'Klikoni butonin e printimit në ekranin "Shpenzimet". Raporti do të përfshijë të gjitha shpenzimet për periudhën e zgjedhur, të grupuara sipas kategorive.',
+      'answer':
+          'Klikoni butonin e printimit në ekranin "Shpenzimet". Raporti do të përfshijë të gjitha shpenzimet për periudhën e zgjedhur, të grupuara sipas kategorive.',
     },
   ];
 
@@ -134,22 +159,20 @@ class _HelpScreenState extends State<HelpScreen> {
 
   List<Map<String, dynamic>> get _filteredFaqs {
     var filtered = _faqs.where((faq) {
-      // Filter by category
       if (_selectedCategory != 'all' && faq['category'] != _selectedCategory) {
         return false;
       }
-      
-      // Filter by search query
+
       if (_searchQuery.isNotEmpty) {
         final question = (faq['question'] as String).toLowerCase();
         final answer = (faq['answer'] as String).toLowerCase();
         final query = _searchQuery.toLowerCase();
         return question.contains(query) || answer.contains(query);
       }
-      
+
       return true;
     }).toList();
-    
+
     return filtered;
   }
 
@@ -161,23 +184,18 @@ class _HelpScreenState extends State<HelpScreen> {
         children: [
           // Header
           Container(
-            decoration: const BoxDecoration(
-              color: AppTheme.bgPage,
-            ),
+            decoration: const BoxDecoration(color: AppTheme.bgPage),
             padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    SvgPicture.asset(
+                    // ✅ SVG header icon
+                    const AppSvgIcon(
                       'assets/icons/info.svg',
-                      width: 32,
-                      height: 32,
-                      colorFilter: const ColorFilter.mode(
-                        Colors.black,
-                        BlendMode.srcIn,
-                      ),
+                      size: 32,
+                      color: AppTheme.text,
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -207,7 +225,7 @@ class _HelpScreenState extends State<HelpScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Search Bar
                 Container(
                   decoration: BoxDecoration(
@@ -222,7 +240,15 @@ class _HelpScreenState extends State<HelpScreen> {
                     },
                     decoration: InputDecoration(
                       hintText: 'Kërko në FAQ...',
-                      prefixIcon: Icon(Icons.search, color: AppTheme.muted),
+                      // ✅ SVG search icon
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: AppSvgIcon(
+                          'assets/icons/search.svg',
+                          size: 20,
+                          color: AppTheme.muted,
+                        ),
+                      ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -230,7 +256,12 @@ class _HelpScreenState extends State<HelpScreen> {
                       ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
-                              icon: Icon(Icons.clear, color: AppTheme.muted),
+                              // ✅ SVG clear icon
+                              icon: const AppSvgIcon(
+                                'assets/icons/close.svg',
+                                size: 18,
+                                color: AppTheme.muted,
+                              ),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() => _searchQuery = '');
@@ -253,10 +284,14 @@ class _HelpScreenState extends State<HelpScreen> {
                 children: [
                   // Categories
                   Row(
-                    children: [
-                      Icon(Icons.category, size: 20, color: AppTheme.text),
-                      const SizedBox(width: 8),
-                      const Text(
+                    children: const [
+                      AppSvgIcon(
+                        'assets/icons/category.svg',
+                        size: 20,
+                        color: AppTheme.text,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
                         'Kategoritë:',
                         style: TextStyle(
                           fontSize: 16,
@@ -267,7 +302,7 @@ class _HelpScreenState extends State<HelpScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
+
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
@@ -275,7 +310,7 @@ class _HelpScreenState extends State<HelpScreen> {
                       return _categoryChip(
                         cat['label'] as String,
                         cat['id'] as String,
-                        cat['icon'] as IconData,
+                        cat['svg'] as String,
                       );
                     }).toList(),
                   ),
@@ -285,7 +320,11 @@ class _HelpScreenState extends State<HelpScreen> {
                   // FAQs Header
                   Row(
                     children: [
-                      Icon(Icons.question_answer, size: 20, color: AppTheme.text),
+                      const AppSvgIcon(
+                        'assets/icons/question.svg',
+                        size: 20,
+                        color: AppTheme.text,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         '${_filteredFaqs.length} Pyetje & Përgjigje',
@@ -311,10 +350,10 @@ class _HelpScreenState extends State<HelpScreen> {
                       child: Center(
                         child: Column(
                           children: [
-                            Icon(
-                              Icons.search_off,
+                            const AppSvgIcon(
+                              'assets/icons/search_off.svg',
                               size: 64,
-                              color: AppTheme.muted.withOpacity(0.5),
+                              color: AppTheme.muted,
                             ),
                             const SizedBox(height: 16),
                             Text(
@@ -350,10 +389,7 @@ class _HelpScreenState extends State<HelpScreen> {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [
-                          Colors.blue.shade700,
-                          Colors.blue.shade500,
-                        ],
+                        colors: [Colors.blue.shade700, Colors.blue.shade500],
                       ),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
@@ -373,10 +409,12 @@ class _HelpScreenState extends State<HelpScreen> {
                             color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Icon(
-                            Icons.support_agent,
-                            color: Colors.white,
-                            size: 32,
+                          child: const Center(
+                            child: AppSvgIcon(
+                              'assets/icons/support_agent.svg',
+                              size: 32,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -394,7 +432,7 @@ class _HelpScreenState extends State<HelpScreen> {
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'Kontaktoni ekipin e mbështetjes për ndihmë të mëtejshme',
+                                'Kontaktoni ekipin e mbështjes për ndihmë të mëtejshme',
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: Colors.white,
@@ -406,7 +444,6 @@ class _HelpScreenState extends State<HelpScreen> {
                         ),
                         ElevatedButton.icon(
                           onPressed: () {
-                            // TODO: Open email or support form
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Email: support@example.com'),
@@ -414,11 +451,15 @@ class _HelpScreenState extends State<HelpScreen> {
                               ),
                             );
                           },
-                          icon: const Icon(Icons.email),
+                          icon: const AppSvgIcon(
+                            'assets/icons/email.svg',
+                            size: 18,
+                            color: Colors.blue,
+                          ),
                           label: const Text('Kontakto'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
-                            foregroundColor: Colors.blue.shade700,
+                            foregroundColor: Colors.blue,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 24,
                               vertical: 16,
@@ -440,9 +481,10 @@ class _HelpScreenState extends State<HelpScreen> {
     );
   }
 
-  Widget _categoryChip(String label, String id, IconData icon) {
+  // ✅ chip me SVG
+  Widget _categoryChip(String label, String id, String svgAsset) {
     final isSelected = _selectedCategory == id;
-    
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -463,8 +505,8 @@ class _HelpScreenState extends State<HelpScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
+              AppSvgIcon(
+                svgAsset,
                 size: 18,
                 color: isSelected ? Colors.white : AppTheme.text,
               ),
@@ -510,10 +552,13 @@ class _HelpScreenState extends State<HelpScreen> {
               color: _getCategoryColor(faq['category']).withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              Icons.help_outline,
-              color: _getCategoryColor(faq['category']),
-              size: 22,
+            // ✅ SVG icon për çdo FAQ (mundesh me e ndrru sipas kategorisë poshtë)
+            child: Center(
+              child: AppSvgIcon(
+                'assets/icons/question.svg',
+                size: 22,
+                color: _getCategoryColor(faq['category']),
+              ),
             ),
           ),
           title: Text(
@@ -558,6 +603,24 @@ class _HelpScreenState extends State<HelpScreen> {
     );
   }
 
+  // ✅ SVG sipas kategorisë (përdor vetëm assets ekzistues)
+  String _getCategorySvg(String category) {
+    switch (category) {
+      case 'shitja':
+        return 'assets/icons/soldtoday.svg';
+      case 'stoku':
+        return 'assets/icons/inv.svg';
+      case 'fitimet':
+        return 'assets/icons/fitimi.svg';
+      case 'shpenzimet':
+        return 'assets/icons/expenses.svg';
+      case 'licenca':
+        return 'assets/icons/key.svg';
+      default:
+        return 'assets/icons/question.svg';
+    }
+  }
+
   Color _getCategoryColor(String category) {
     switch (category) {
       case 'shitja':
@@ -590,5 +653,27 @@ class _HelpScreenState extends State<HelpScreen> {
       default:
         return category.toUpperCase();
     }
+  }
+}
+
+class AppSvgIcon extends StatelessWidget {
+  final String asset;
+  final double size;
+  final Color? color;
+
+  const AppSvgIcon(this.asset, {super.key, this.size = 20, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return SvgPicture.asset(
+      asset,
+      width: size,
+      height: size,
+      colorFilter: color == null
+          ? null
+          : ColorFilter.mode(color!, BlendMode.srcIn),
+      placeholderBuilder: (_) => Icon(Icons.image, size: size, color: color),
+      excludeFromSemantics: true,
+    );
   }
 }

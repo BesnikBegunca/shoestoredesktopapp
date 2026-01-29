@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'database_manager.dart';
 import '../license/license_service.dart';
@@ -11,18 +10,19 @@ class CleanupAndMigrate {
   /// Fshi të gjitha databazat dhe fillo nga e para
   static Future<void> cleanAllAndRestart() async {
     DatabaseManager.ensureSqfliteInitialized();
+    await DatabaseManager.closeAll();
 
-    final dir = await getApplicationSupportDirectory();
-    
+    final dbRoot = await DatabaseManager.getDatabaseRootPath();
     print('🗑️  Duke fshirë të gjitha databazat...');
-    
-    // Lista e të gjitha .sqlite files
-    final files = await dir.list().toList();
-    for (final file in files) {
-      if (file.path.endsWith('.sqlite')) {
-        final name = p.basename(file.path);
-        await (file as File).delete();
-        print('  ✅ Fshiu: $name');
+    final dbDir = Directory(dbRoot);
+    if (await dbDir.exists()) {
+      final files = await dbDir.list().toList();
+      for (final file in files) {
+        if (file.path.endsWith('.sqlite')) {
+          final name = p.basename(file.path);
+          await (file as File).delete();
+          print('  ✅ Fshiu: $name');
+        }
       }
     }
     
@@ -50,7 +50,7 @@ class CleanupAndMigrate {
   static Future<void> deleteAllBusinesses() async {
     DatabaseManager.ensureSqfliteInitialized();
 
-    final dir = await getApplicationSupportDirectory();
+    final dbRoot = await DatabaseManager.getDatabaseRootPath();
     final adminDb = await DatabaseManager.getAdminDb();
     
     print('🗑️  Duke fshirë të gjitha bizneset...');
@@ -68,8 +68,8 @@ class CleanupAndMigrate {
       // Fshi biznesin
       await adminDb.delete('businesses', where: 'id = ?', whereArgs: [businessId]);
       
-      // Fshi databazën
-      final dbPath = p.join(dir.path, 'business_$businessId.sqlite');
+      // Fshi databazën (në db/)
+      final dbPath = p.join(dbRoot, '${DatabaseManager.kBusinessDbPrefix}$businessId${DatabaseManager.kBusinessDbSuffix}');
       final file = File(dbPath);
       if (await file.exists()) {
         await file.delete();
@@ -167,20 +167,23 @@ class CleanupAndMigrate {
   static Future<void> printSystemInfo() async {
     DatabaseManager.ensureSqfliteInitialized();
 
-    final dir = await getApplicationSupportDirectory();
+    final dbRoot = await DatabaseManager.getDatabaseRootPath();
     
     print('\n📊 Informacion i Sistemit');
     print('═' * 60);
     
-    // Databazat
+    // Databazat (në db/)
     print('\n📁 Databazat:');
-    final files = await dir.list().toList();
-    for (final file in files) {
-      if (file.path.endsWith('.sqlite')) {
-        final name = p.basename(file.path);
-        final size = await (file as File).length();
-        final sizeKB = (size / 1024).toStringAsFixed(2);
-        print('  • $name ($sizeKB KB)');
+    final dbDir = Directory(dbRoot);
+    if (await dbDir.exists()) {
+      final files = await dbDir.list().toList();
+      for (final file in files) {
+        if (file.path.endsWith('.sqlite')) {
+          final name = p.basename(file.path);
+          final size = await (file as File).length();
+          final sizeKB = (size / 1024).toStringAsFixed(2);
+          print('  • $name ($sizeKB KB)');
+        }
       }
     }
     

@@ -17,10 +17,10 @@ class MigrationHelper {
     return File(oldPath).exists();
   }
 
-  /// Kontrollo nëse ekziston databaza e re admin
+  /// Kontrollo nëse ekziston databaza e re admin (në db/)
   static Future<bool> hasNewDatabase() async {
-    final dir = await getApplicationSupportDirectory();
-    final newPath = p.join(dir.path, 'shoe_store_admin.sqlite');
+    final dbRoot = await DatabaseManager.getDatabaseRootPath();
+    final newPath = p.join(dbRoot, DatabaseManager.kAdminDbFileName);
     return File(newPath).exists();
   }
 
@@ -275,19 +275,21 @@ class MigrationHelper {
     }
   }
 
-  /// Print info mbi databazat
+  /// Print info mbi databazat (në db/)
   static Future<void> printDatabaseInfo() async {
-    final dir = await getApplicationSupportDirectory();
+    final dbRoot = await DatabaseManager.getDatabaseRootPath();
     print('\n📊 Database Info:');
     print('─' * 50);
-    
-    final files = await dir.list().toList();
-    for (final file in files) {
-      if (file.path.endsWith('.sqlite')) {
-        final name = p.basename(file.path);
-        final size = await (file as File).length();
-        final sizeKB = (size / 1024).toStringAsFixed(2);
-        print('  $name ($sizeKB KB)');
+    final dbDir = Directory(dbRoot);
+    if (await dbDir.exists()) {
+      final files = await dbDir.list().toList();
+      for (final file in files) {
+        if (file.path.endsWith('.sqlite')) {
+          final name = p.basename(file.path);
+          final size = await (file as File).length();
+          final sizeKB = (size / 1024).toStringAsFixed(2);
+          print('  $name ($sizeKB KB)');
+        }
       }
     }
     print('─' * 50);

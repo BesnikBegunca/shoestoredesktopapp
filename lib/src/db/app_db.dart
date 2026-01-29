@@ -1,14 +1,18 @@
-import 'dart:io';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'schema.dart';
 import 'database_manager.dart';
 
+/// Databazë e vjetër single-tenant (aktualisht nuk përdoret nga aplikacioni).
+/// Nëse përdoret, hapet nga i njëjti rrënjë db/ (Application Support/db/) si DatabaseManager.
+@Deprecated('Aplikacioni përdor DatabaseManager (multi-tenant). Përdore DatabaseManager nëse nevojitet.')
 class AppDb {
   AppDb._();
   static final AppDb I = AppDb._();
+
+  /// Emri i skedarit (kurrë mos ndrysho midis versioneve)
+  static const String kDbFileName = 'shoe_store.db';
 
   Database? _db;
 
@@ -25,9 +29,8 @@ class AppDb {
     if (existing != null) return existing;
 
     DatabaseManager.ensureSqfliteInitialized();
-
-    final docs = await getApplicationDocumentsDirectory();
-    final dbPath = p.join(docs.path, 'shoe_store.db');
+    final dbRoot = await DatabaseManager.getDatabaseRootPath();
+    final dbPath = p.join(dbRoot, kDbFileName);
 
     final database = await openDatabase(
       dbPath,

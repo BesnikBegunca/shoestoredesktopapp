@@ -1,22 +1,43 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:sqflite_common/sqlite_api.dart' show DatabaseExecutor;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// Menaxhon databazat e shumta për sistemin multi-tenancy
 /// - Admin DB: përmban superadmin users, businesses, dhe business_licenses
 /// - Business DBs: një databazë e veçantë për çdo biznes me të gjitha të dhënat operative
+/// - DB ruhet jashtë bundle/.exe në Application Support/db/ (path kurrë nuk ndryshon midis versioneve)
 class DatabaseManager {
   DatabaseManager._();
-  
+
+  /// Nënfolder fiks për skedarët e DB (kurrë mos ndrysho midis versioneve)
+  static const String kDbSubfolder = 'db';
+  /// Emri i skedarit admin (kurrë mos ndrysho)
+  static const String kAdminDbFileName = 'shoe_store_admin.sqlite';
+  /// Prefix për skedarët e bizneseve (kurrë mos ndrysho). Emri: business_<id>.sqlite
+  static const String kBusinessDbPrefix = 'business_';
+  static const String kBusinessDbSuffix = '.sqlite';
+
   static Database? _adminDb;
   static final Map<int, Database> _businessDbs = {};
   static int? _currentBusinessId;
   static bool _isInitialized = false;
-  
+
   static const int kAdminDbVersion = 1;
   static const int kBusinessDbVersion = 13; // Added business_category_sizes table
-  
+
+  /// Rrënja e të gjitha skedarëve të DB: ApplicationSupport/db/ (krijohet nëse nuk ekziston)
+  static Future<String> _getDatabaseRootPath() async {
+    final dir = await getApplicationSupportDirectory();
+    final dbRoot = p.join(dir.path, kDbSubfolder);
+    await Directory(dbRoot).create(recursive: true);
+    return dbRoot;
+  }
+
+  /// Ekspozohet për migration_helper / cleanup_and_migrate (rrënja db/)
+  static Future<String> getDatabaseRootPath() async => _getDatabaseRootPath();
+
   /// Inicializo sqflite FFI në mënyrë të sigurt (vetëm një herë)
   /// Ky funksion mund të përdoret nga çdo vend në aplikacion
   /// për të siguruar që sqflite është inicializuar pa shkaktuar paralajmërime
@@ -33,16 +54,40 @@ class DatabaseManager {
     ensureSqfliteInitialized();
   }
   
+  /// Migrim një herë: lëviz skedarët e DB nga rrënja e Application Support në db/ (nëse ekzistojnë atje)
+  static Future<void> _migrateDbFilesToSubfolderIfNeeded() async {
+    final dir = await getApplicationSupportDirectory();
+    final dbRoot = p.join(dir.path, kDbSubfolder);
+    await Directory(dbRoot).create(recursive: true);
+    final adminOldPath = p.join(dir.path, kAdminDbFileName);
+    final adminNewPath = p.join(dbRoot, kAdminDbFileName);
+    if (await File(adminOldPath).exists() && !await File(adminNewPath).exists()) {
+      await File(adminOldPath).copy(adminNewPath);
+      await File(adminOldPath).delete();
+    }
+    await for (final entity in dir.list()) {
+      if (entity is! File) continue;
+      final name = p.basename(entity.path);
+      if (name.startsWith(kBusinessDbPrefix) && name.endsWith(kBusinessDbSuffix)) {
+        final newPath = p.join(dbRoot, name);
+        if (!await File(newPath).exists()) {
+          await entity.copy(newPath);
+          await entity.delete();
+        }
+      }
+    }
+  }
+
   /// Merr databazën admin (qendrore)
   static Future<Database> getAdminDb() async {
     if (_adminDb != null) return _adminDb!;
-    
+
     _ensureInitialized();
-    
-    final Directory dir = await getApplicationSupportDirectory();
-    await dir.create(recursive: true);
-    final String dbPath = p.join(dir.path, 'shoe_store_admin.sqlite');
-    
+    await _migrateDbFilesToSubfolderIfNeeded();
+
+    final dbRoot = await _getDatabaseRootPath();
+    final String dbPath = p.join(dbRoot, kAdminDbFileName);
+
     final db = await openDatabase(
       dbPath,
       version: kAdminDbVersion,
@@ -66,13 +111,13 @@ class DatabaseManager {
     if (_businessDbs.containsKey(businessId)) {
       return _businessDbs[businessId]!;
     }
-    
+
     _ensureInitialized();
-    
-    final Directory dir = await getApplicationSupportDirectory();
-    await dir.create(recursive: true);
-    final String dbPath = p.join(dir.path, 'business_$businessId.sqlite');
-    
+    await _migrateDbFilesToSubfolderIfNeeded();
+
+    final dbRoot = await _getDatabaseRootPath();
+    final String dbPath = p.join(dbRoot, '$kBusinessDbPrefix$businessId$kBusinessDbSuffix');
+
     final db = await openDatabase(
       dbPath,
       version: kBusinessDbVersion,
@@ -80,8 +125,10 @@ class DatabaseManager {
         await _createBusinessSchema(d);
       },
       onUpgrade: (d, oldV, newV) async {
-        await _createBusinessSchema(d);
-        await _migrateBusinessDb(d, oldV, newV);
+        await d.transaction((txn) async {
+          await _createBusinessSchema(txn);
+          await _migrateBusinessDb(txn, oldV, newV);
+        });
       },
       onOpen: (d) async {
         await _createBusinessSchema(d);
@@ -116,8 +163,8 @@ class DatabaseManager {
   
   /// Kontrollo nëse databaza e një biznesi ekziston
   static Future<bool> businessDatabaseExists(int businessId) async {
-    final Directory dir = await getApplicationSupportDirectory();
-    final String dbPath = p.join(dir.path, 'business_$businessId.sqlite');
+    final dbRoot = await _getDatabaseRootPath();
+    final String dbPath = p.join(dbRoot, '$kBusinessDbPrefix$businessId$kBusinessDbSuffix');
     return File(dbPath).exists();
   }
   
@@ -129,8 +176,8 @@ class DatabaseManager {
       _businessDbs.remove(businessId);
     }
     
-    final Directory dir = await getApplicationSupportDirectory();
-    final String dbPath = p.join(dir.path, 'business_$businessId.sqlite');
+    final dbRoot = await _getDatabaseRootPath();
+    final String dbPath = p.join(dbRoot, '$kBusinessDbPrefix$businessId$kBusinessDbSuffix');
     final file = File(dbPath);
     if (await file.exists()) {
       await file.delete();
@@ -155,7 +202,7 @@ class DatabaseManager {
   
   // ================= SCHEMA CREATION =================
   
-  static Future<void> _createAdminSchema(Database db) async {
+  static Future<void> _createAdminSchema(DatabaseExecutor db) async {
     // Users table (vetëm superadmin)
     await db.execute('''
       CREATE TABLE IF NOT EXISTS users (
@@ -209,7 +256,7 @@ class DatabaseManager {
     ''');
   }
   
-  static Future<void> _createBusinessSchema(Database db) async {
+  static Future<void> _createBusinessSchema(DatabaseExecutor db) async {
     // Users table (admin dhe workers të biznesit)
     await db.execute('''
       CREATE TABLE IF NOT EXISTS users (
@@ -372,8 +419,9 @@ class DatabaseManager {
     ''');
   }
   
-  static Future<void> _migrateBusinessDb(Database db, int oldVersion, int newVersion) async {
-    // Migration logic për databazat e bizneseve (nëse nevojitet)
+  /// Vetëm migrime shtuese: CREATE TABLE IF NOT EXISTS, ADD COLUMN, CREATE INDEX IF NOT EXISTS.
+  /// Asnjëherë mos përdor DROP TABLE / DROP COLUMN (të dhënat e klientit nuk duhen humbur).
+  static Future<void> _migrateBusinessDb(DatabaseExecutor db, int oldVersion, int newVersion) async {
     if (oldVersion < 11) {
       // Add any missing columns
       try {

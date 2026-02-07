@@ -44,6 +44,8 @@ String formatSizeLabel(int size) {
       return '5Y';
     case 1010:
       return '6Y';
+    case 1011:
+      return 'S'; // Standard
     default:
       return size.toString(); // normal shoe sizes (36,37..)
   }

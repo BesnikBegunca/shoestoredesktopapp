@@ -67,6 +67,8 @@ String formatSizeLabel(int size) {
       return '5Y';
     case 1010:
       return '6Y';
+    case 1011:
+      return 'S'; // Standard
     default:
       return size.toString(); // normal shoe sizes (36,37..)
   }
@@ -1526,15 +1528,13 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
     return Focus(
       focusNode: pageFocusNode,
       onKeyEvent: _handleKeyEvent,
-      autofocus: true,
+      autofocus: false,
       child: Scaffold(
         backgroundColor: AppTheme.bg,
-        body: GestureDetector(
-          onTap: () => barcodeFocus.requestFocus(),
-          child: Column(
-            children: [
-              // Header - Single Row: Titull majtas, Barcode actions djathtas
-              Container(
+        body: Column(
+          children: [
+            // Header - Single Row: Titull majtas, Barcode actions djathtas (pa GestureDetector që të mund të klikosh dhe të shkruash në TextField)
+            Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32,
                   vertical: 20,
@@ -1656,11 +1656,15 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
                             onTap: () {
                               // ✅ Kur përdoruesi klikon TextField për manual entry:
                               // 1. Hiq focus nga page-level listener
-                              // 2. Pastro buffer të global listener për të shmangur konfliktin
+                              // 2. Pastro buffer të global listener
+                              // 3. Jep fokus te fusha e barkodit që të mund të shkruajë me një klikim (pa mbajtur tastin)
                               pageFocusNode.unfocus();
                               _barcodeBuffer = '';
                               _barcodeTimer?.cancel();
                               _barcodeTimer = null;
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) barcodeFocus.requestFocus();
+                              });
                             },
                             // ✅ Lejo të gjitha operacionet normale: paste, select all, etj.
                             enableInteractiveSelection: true,
@@ -1740,50 +1744,54 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
               // Cart Table - Advanced Design
               Expanded(
                 child: cart.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(32),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
+                    ? GestureDetector(
+                        onTap: () => barcodeFocus.requestFocus(),
+                        behavior: HitTestBehavior.opaque,
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(32),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Icons.shopping_cart_outlined,
+                                  size: 100,
+                                  color: Colors.black.withOpacity(0.3),
+                                ),
                               ),
-                              child: Icon(
-                                Icons.shopping_cart_outlined,
-                                size: 100,
-                                color: Colors.black.withOpacity(0.3),
+                              const SizedBox(height: 32),
+                              const Text(
+                                'Shporta është bosh',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: -0.5,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 32),
-                            const Text(
-                              'Shporta është bosh',
-                              style: TextStyle(
-                                fontSize: 24,
-                                color: Colors.black,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: -0.5,
+                              const SizedBox(height: 12),
+                              Text(
+                                'Skano barcode për të shtuar produkte',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.black.withOpacity(0.6),
+                                  fontWeight: FontWeight.w400,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Skano barcode për të shtuar produkte',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.black.withOpacity(0.6),
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       )
                     : SingleChildScrollView(
@@ -2088,7 +2096,6 @@ class _DailySaleScreenState extends State<DailySaleScreen> {
               _buildCompactBottomBar(total),
             ],
           ),
-        ),
       ),
     );
   }

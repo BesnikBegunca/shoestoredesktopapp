@@ -70,6 +70,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     '4Y',
     '5Y',
     '6Y',
+    'S', // Standard
   ];
 
   List<String> get categories => categoryTags.keys.toList();
@@ -1579,6 +1580,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
           clothCtrls[label] = TextEditingController(text: '0');
         }
       }
+    }
+    
+    // ✅ S (Standard) gjithmonë e para në grid
+    if (sizesToShow.contains('S')) {
+      sizesToShow = ['S', ...sizesToShow.where((s) => s != 'S')];
     }
     
     return LayoutBuilder(

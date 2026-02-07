@@ -246,7 +246,7 @@ int? _optionalSizeToKey(String? s) {
   const map = {
     '0-3M': 1000, '3-6M': 1001, '6-9M': 1002, '9-12M': 1003,
     '12-18M': 1004, '18-24M': 1005, '2Y': 1006, '3Y': 1007,
-    '4Y': 1008, '5Y': 1009, '6Y': 1010,
+    '4Y': 1008, '5Y': 1009, '6Y': 1010, 'S': 1011, // Standard
   };
   return map[t] ?? map[t.replaceAll(' ', '')];
 }
@@ -256,7 +256,7 @@ String _sizeKeyToVariantSize(int key) {
   const map = {
     1000: '0-3M', 1001: '3-6M', 1002: '6-9M', 1003: '9-12M',
     1004: '12-18M', 1005: '18-24M', 1006: '2Y', 1007: '3Y',
-    1008: '4Y', 1009: '5Y', 1010: '6Y',
+    1008: '4Y', 1009: '5Y', 1010: '6Y', 1011: 'S', // Standard
   };
   return map[key] ?? key.toString();
 }

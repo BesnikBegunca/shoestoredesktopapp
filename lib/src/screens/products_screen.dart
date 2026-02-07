@@ -22,6 +22,8 @@ class ProductsScreen extends StatefulWidget {
 class _ProductsScreenState extends State<ProductsScreen> {
   bool _loading = true;
   List<Product> _items = [];
+  final TextEditingController _barcodeSearchController = TextEditingController();
+  final FocusNode _barcodeSearchFocus = FocusNode();
 
   // ✅ labels për tesha (key 1000..)
   static const List<String> _clothLabels = [
@@ -36,12 +38,32 @@ class _ProductsScreenState extends State<ProductsScreen> {
     '4Y',
     '5Y',
     '6Y',
+    'S', // Standard
   ];
 
   @override
   void initState() {
     super.initState();
     _load();
+    _barcodeSearchController.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _barcodeSearchController.dispose();
+    _barcodeSearchFocus.dispose();
+    super.dispose();
+  }
+
+  /// Lista e filtruar sipas barkodit që shkruhet në search (sku ose serialNumber).
+  List<Product> get _filteredItems {
+    final q = _barcodeSearchController.text.trim().toLowerCase();
+    if (q.isEmpty) return _items;
+    return _items.where((p) {
+      final sku = p.sku?.toLowerCase() ?? '';
+      final serial = p.serialNumber?.toLowerCase() ?? '';
+      return sku.contains(q) || serial.contains(q);
+    }).toList();
   }
 
   bool _hasValidImage(String? path) {
@@ -640,10 +662,60 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       ],
                     ),
                   ),
+                  // Filtro listën e stokut sipas barkodit (live, pa SnackBar)
+                  SizedBox(
+                    width: 280,
+                    child: TextField(
+                      controller: _barcodeSearchController,
+                      focusNode: _barcodeSearchFocus,
+                      decoration: InputDecoration(
+                        hintText: 'Shkruaj barcode...',
+                        hintStyle: TextStyle(
+                          color: Colors.black54,
+                          fontSize: 14,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          size: 22,
+                          color: Colors.black54,
+                        ),
+                        suffixIcon: _barcodeSearchController.text.trim().isNotEmpty
+                            ? IconButton(
+                                icon: Icon(Icons.clear, size: 20, color: Colors.black54),
+                                onPressed: () {
+                                  _barcodeSearchController.clear();
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.black87, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            // Body Content
+            // Body Content (lista filtrohet live sipas barkodit)
             Expanded(
               child: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -652,6 +724,20 @@ class _ProductsScreenState extends State<ProductsScreen> {
               child: Text(
                 'S’ka produkte ende.',
                 style: TextStyle(color: AppTheme.text),
+              ),
+            )
+          : _filteredItems.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Asnjë produkt me këtë barcode.',
+                    style: TextStyle(color: AppTheme.text, fontSize: 16),
+                  ),
+                ],
               ),
             )
           : Container(
@@ -692,18 +778,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       ],
                     ),
                   ),
-                  // Table Rows
+                  // Table Rows (lista e filtruar)
                   Expanded(
                     child: ListView.separated(
                       padding: EdgeInsets.zero,
-                      itemCount: _items.length,
+                      itemCount: _filteredItems.length,
                       separatorBuilder: (_, __) => Divider(
                         height: 1,
                         thickness: 1,
                         color: Colors.grey.withOpacity(0.15),
                       ),
                       itemBuilder: (_, i) {
-                        final p0 = _items[i];
+                        final p0 = _filteredItems[i];
                         final hasDisc = p0.discountPercent > 0;
                         return _tableRow(p0, hasDisc);
                       },
@@ -1004,6 +1090,7 @@ class _StockBySizeDialogState extends State<_StockBySizeDialog> {
     '4Y',
     '5Y',
     '6Y',
+    'S', // Standard
   ];
 
   int _clothKey(int index) => 1000 + index;
@@ -1104,6 +1191,8 @@ class _StockBySizeDialogState extends State<_StockBySizeDialog> {
           return '5Y';
         case 1010:
           return '6Y';
+        case 1011:
+          return 'S';
         default:
           return size.toString();
       }
@@ -1389,12 +1478,14 @@ class _StockBySizeDialogState extends State<_StockBySizeDialog> {
   }
 
   Widget _clothSizesGrid() {
+    // ✅ S (Standard) gjithmonë e para në grid
+    final displayOrder = ['S', ...clothSizes.where((s) => s != 'S')];
     return LayoutBuilder(
       builder: (context, c) {
         final cols = c.maxWidth >= 800 ? 4 : (c.maxWidth >= 600 ? 3 : 2);
         final tiles = <Widget>[];
 
-        for (final label in clothSizes) {
+        for (final label in displayOrder) {
           final ctrl = clothCtrls[label]!;
           final q = _parseInt(ctrl.text);
 
@@ -1733,6 +1824,7 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
     '4Y',
     '5Y',
     '6Y',
+    'S', // Standard
   ];
 
   int _clothKey(int index) => 1000 + index;
@@ -2644,12 +2736,14 @@ class _ProductFormDialogState extends State<_ProductFormDialog> {
   }
 
   Widget _clothSizesGrid() {
+    // ✅ S (Standard) gjithmonë e para në grid
+    final displayOrder = ['S', ...clothSizes.where((s) => s != 'S')];
     return LayoutBuilder(
       builder: (context, c) {
         final cols = c.maxWidth >= 620 ? 4 : 2;
         final tiles = <Widget>[];
 
-        for (final label in clothSizes) {
+        for (final label in displayOrder) {
           final ctrl = clothCtrls[label]!;
           final q = _parseInt(ctrl.text);
           final ok = q > 0;

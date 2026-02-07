@@ -14,6 +14,7 @@ const List<String> _clothLabels = [
   '4Y',
   '5Y',
   '6Y',
+  'S', // Standard
 ];
 
 // ✅ key 1000.. => label, ndryshe => numri i patikave
